@@ -192,7 +192,7 @@ export default function SongCard({
       <button
         onClick={handleSpotifyClick}
         disabled={spotifyState === "loading" || spotifyState === "not_found"}
-        className={`shrink-0 transition-colors opacity-0 group-hover:opacity-100 ${spotifyColor} ${spotifyState === "error" ? "animate-pulse" : ""}`}
+        className={`shrink-0 transition-colors opacity-30 group-hover:opacity-100 ${spotifyColor} ${spotifyState === "error" ? "animate-pulse" : ""}`}
         aria-label={spotifyTitle}
         title={spotifyTitle}
       >
