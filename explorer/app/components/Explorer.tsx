@@ -31,6 +31,7 @@ export default function Explorer() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [artistFilter, setArtistFilter] = useState<string>("");
   const [yearFilter, setYearFilter] = useState<string>(ALL_YEARS);
   const [genreFilter, setGenreFilter] = useState<string>(ALL_GENRES);
   const [page, setPage] = useState(1);
@@ -66,6 +67,10 @@ export default function Explorer() {
       result = result.filter((s) => s.genre === genreFilter);
     }
 
+    if (artistFilter) {
+      result = result.filter((s) => s.artist === artistFilter);
+    }
+
     if (query.trim()) {
       const q = normalize(query);
       result = result.filter(
@@ -77,7 +82,7 @@ export default function Explorer() {
     }
 
     return result;
-  }, [songs, query, yearFilter, genreFilter]);
+  }, [songs, query, artistFilter, yearFilter, genreFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -95,8 +100,15 @@ export default function Explorer() {
     setRandomSong(pool[Math.floor(Math.random() * pool.length)]);
   };
 
+  const handleArtistClick = useCallback((artist: string) => {
+    setArtistFilter(artist);
+    setQuery("");
+    setPage(1);
+  }, []);
+
   const activeFilters =
     (query ? 1 : 0) +
+    (artistFilter ? 1 : 0) +
     (yearFilter !== ALL_YEARS ? 1 : 0) +
     (genreFilter !== ALL_GENRES ? 1 : 0);
 
@@ -139,16 +151,16 @@ export default function Explorer() {
             className="flex-1 min-w-0 rounded-lg bg-neutral-800 border border-neutral-700 px-4 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
           />
 
-          {/* Year */}
+          {/* Year played */}
           <select
             value={yearFilter}
             onChange={(e) => handleFilterChange(setYearFilter)(e.target.value)}
             className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-neutral-500 cursor-pointer"
           >
-            <option value={ALL_YEARS}>All years</option>
+            <option value={ALL_YEARS}>Year played (all)</option>
             {years.map((y) => (
               <option key={y} value={y}>
-                {y}
+                Played in {y}
               </option>
             ))}
           </select>
@@ -180,37 +192,42 @@ export default function Explorer() {
       {/* Results summary */}
       {!loading && (
         <div className="px-4 py-2 sm:px-8">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
-            <p className="text-xs text-neutral-500">
-              {activeFilters > 0 ? (
-                <>
-                  <span className="text-neutral-300">
-                    {filtered.length.toLocaleString()}
-                  </span>{" "}
-                  results
-                  {totalPages > 1 && (
-                    <>
-                      {" "}
-                      &middot; page {page} of {totalPages}
-                    </>
-                  )}
-                </>
-              ) : (
-                <>
-                  Showing {paginated.length} of{" "}
-                  {songs.length.toLocaleString()} songs
-                </>
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              {artistFilter && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 px-3 py-1 text-xs text-white">
+                  {artistFilter}
+                  <button
+                    onClick={() => { setArtistFilter(""); setPage(1); }}
+                    className="text-neutral-500 hover:text-white transition-colors"
+                    aria-label="Remove artist filter"
+                  >×</button>
+                </span>
               )}
-            </p>
+              <p className="text-xs text-neutral-500">
+                {activeFilters > 0 ? (
+                  <>
+                    <span className="text-neutral-300">
+                      {filtered.length.toLocaleString()}
+                    </span>{" "}
+                    result{filtered.length !== 1 ? "s" : ""}
+                    {totalPages > 1 && <> &middot; page {page} of {totalPages}</>}
+                  </>
+                ) : (
+                  <>Showing {paginated.length} of {songs.length.toLocaleString()} songs</>
+                )}
+              </p>
+            </div>
             {activeFilters > 0 && (
               <button
                 onClick={() => {
                   setQuery("");
+                  setArtistFilter("");
                   setYearFilter(ALL_YEARS);
                   setGenreFilter(ALL_GENRES);
                   setPage(1);
                 }}
-                className="text-xs text-neutral-500 hover:text-white transition-colors underline"
+                className="text-xs text-neutral-500 hover:text-white transition-colors underline shrink-0"
               >
                 Clear filters
               </button>
@@ -267,7 +284,7 @@ export default function Explorer() {
           ) : (
             <div className="grid gap-2">
               {paginated.map((song) => (
-                <SongCard key={song.id} song={song} />
+                <SongCard key={song.id} song={song} onArtistClick={handleArtistClick} />
               ))}
             </div>
           )}
