@@ -19,7 +19,7 @@ COLUMNS = [
 KEEP = {
     "id", "artist", "title", "broadcast_date", "show_date",
     "spotify_track_id", "spotify_popularity", "spotify_preview_url",
-    "mb_release_year", "mb_release", "genre", "release_date",
+    "mbid", "mb_release_year", "mb_release", "genre", "release_date",
     "enrich_status"
 }
 
