@@ -57,8 +57,11 @@ def best_tag(tags: list, min_count: int = 5) -> str | None:
         count = int(tag.get("count", 0))
         if count < min_count:
             break
-        if name not in SKIP_TAGS and len(name) > 1:
-            return name
+        if name in SKIP_TAGS or len(name) <= 1:
+            continue
+        if name.isdigit():  # skip pure numeric tags ("11", "1726", "1990")
+            continue
+        return name
     return None
 
 def fetch_track_genre(artist: str, title: str) -> str | None:
