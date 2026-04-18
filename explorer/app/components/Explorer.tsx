@@ -162,6 +162,17 @@ export default function Explorer() {
     setPage(1);
   }, []);
 
+  const handleSpotifyResult = useCallback(
+    (artist: string, title: string, url: string) => {
+      setSongs((prev) =>
+        prev.map((s) =>
+          s.artist === artist && s.title === title ? { ...s, spotify_url: url } : s
+        )
+      );
+    },
+    []
+  );
+
   const activeFilters =
     (query ? 1 : 0) +
     (artistFilter ? 1 : 0) +
@@ -357,6 +368,7 @@ export default function Explorer() {
                   onArtistClick={handleArtistClick}
                   onGenreClick={handleGenreClick}
                   onReleaseYearClick={handleReleaseYearClick}
+                  onSpotifyResult={handleSpotifyResult}
                 />
               ))}
             </div>
