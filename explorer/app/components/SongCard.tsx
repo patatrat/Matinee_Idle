@@ -30,7 +30,7 @@ function cacheKey(artist: string, title: string) {
   return `matinee-spotify:${artist.toLowerCase()}|||${title.toLowerCase()}`;
 }
 
-type SpotifyState = "idle" | "loading" | "found" | "not_found";
+type SpotifyState = "idle" | "loading" | "found" | "not_found" | "error";
 
 export default function SongCard({
   song,
@@ -88,8 +88,13 @@ export default function SongCard({
     try {
       const params = new URLSearchParams({ artist: song.artist, title: song.title });
       const resp = await fetch(`/api/spotify?${params}`);
-      if (!resp.ok) {
+      if (resp.status === 404) {
         setSpotifyState("not_found");
+        return;
+      }
+      if (!resp.ok) {
+        // 429 rate limit, 500 error, network failure — all retryable
+        setSpotifyState("error");
         return;
       }
       const data = await resp.json();
@@ -99,19 +104,21 @@ export default function SongCard({
       setSpotifyState("found");
       window.open(url, "_blank", "noopener,noreferrer");
     } catch {
-      setSpotifyState("not_found");
+      setSpotifyState("error");
     }
   }
 
   const spotifyTitle =
     spotifyState === "loading" ? "Searching Spotify…" :
     spotifyState === "not_found" ? "Not found on Spotify" :
+    spotifyState === "error" ? "Search failed — click to retry" :
     "Open in Spotify";
 
   const spotifyColor =
     spotifyState === "found" ? "text-green-400" :
     spotifyState === "not_found" ? "text-neutral-700 cursor-not-allowed" :
     spotifyState === "loading" ? "text-neutral-600" :
+    spotifyState === "error" ? "text-amber-600 hover:text-amber-400" :
     "text-neutral-600 hover:text-green-400";
 
   return (
@@ -176,7 +183,7 @@ export default function SongCard({
       <button
         onClick={handleSpotifyClick}
         disabled={spotifyState === "loading" || spotifyState === "not_found"}
-        className={`shrink-0 transition-colors opacity-0 group-hover:opacity-100 ${spotifyColor}`}
+        className={`shrink-0 transition-colors opacity-0 group-hover:opacity-100 ${spotifyColor} ${spotifyState === "error" ? "animate-pulse" : ""}`}
         aria-label={spotifyTitle}
         title={spotifyTitle}
       >
