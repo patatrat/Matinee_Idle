@@ -31,8 +31,9 @@ CHECKPOINT  = os.path.join(HERE, "spotify_cache.json")
 CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID",     "f3bcd797aeaa4a50bcb6132366835d64")
 CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "30e26fd9d30844d08b94dced12fe380d")
 
-RATE_LIMIT  = 0.15   # ~6 req/sec — safe for Spotify search
-SAVE_EVERY  = 200
+RATE_LIMIT  = 0.5    # 2 req/sec — conservative for dev mode quota
+SAVE_EVERY  = 100
+MAX_RETRY_AFTER = 120  # if Spotify asks us to wait longer, abort the run
 DRY_RUN     = "--dry-run" in sys.argv
 
 
@@ -135,9 +136,14 @@ def search_track(artist: str, title: str) -> list:
         except urllib.error.HTTPError as e:
             if e.code == 429:
                 retry_after = int(e.headers.get("Retry-After", 5))
+                if retry_after > MAX_RETRY_AFTER:
+                    raise RuntimeError(
+                        f"Spotify daily quota likely exhausted (Retry-After: {retry_after}s). "
+                        "Wait until tomorrow and rerun — the checkpoint will resume from here."
+                    )
                 print(f"  Rate limited — sleeping {retry_after}s")
                 time.sleep(retry_after)
-                return search_track(artist, title)   # retry same call
+                return search_track(artist, title)
             if e.code in (400, 404):
                 return []
             raise
