@@ -74,7 +74,23 @@ def save_checkpoint(cache: dict):
         json.dump(cache, f)
 
 
+def ensure_songs_json():
+    """Generate songs.json from the backup if it doesn't exist."""
+    if os.path.exists(SONGS_IN):
+        return
+    backups = [f for f in os.listdir(HERE) if f.endswith(".backup.gz")]
+    if not backups:
+        sys.exit(f"ERROR: {SONGS_IN} not found and no .backup.gz file in {HERE}")
+    extract = os.path.join(HERE, "extract_songs.py")
+    if not os.path.exists(extract):
+        sys.exit(f"ERROR: {SONGS_IN} not found. Run extract_songs.py first.")
+    print(f"songs.json not found — running extract_songs.py first...")
+    import subprocess
+    subprocess.run([sys.executable, extract], check=True)
+
+
 def main():
+    ensure_songs_json()
     songs = json.load(open(SONGS_IN))
 
     # Songs needing genre lookup: have mbid, no genre
