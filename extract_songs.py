@@ -67,6 +67,10 @@ with gzip.open(backup_path, "rt", encoding="utf-8", errors="replace") as f:
             else:
                 row["release_year"] = None
 
+            # take only the first tag if genre was stored as a comma-separated list
+            if row.get("genre") and "," in row["genre"]:
+                row["genre"] = row["genre"].split(",")[0].strip() or None
+
             # clean up redundant fields
             row.pop("mb_release_year", None)
             row.pop("release_date", None)

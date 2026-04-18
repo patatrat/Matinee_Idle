@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """
-Step 1b: Genre enrichment via Last.fm artist.getTopTags.
+Step 1b: Genre enrichment via Last.fm track.getTopTags + artist.getTopTags fallback.
 
-Reads songs_enriched.json (or songs.json if that doesn't exist), fetches
-genre tags for every unique artist that still has no genre, writes result
-back to songs_enriched.json.
+Fetches track-specific tags for every song (more accurate than artist-level tags),
+falling back to artist.getTopTags when a track has no tags. Overwrites ALL existing
+genres — including bad data from the original enrichment.
+
+Reads songs_enriched.json (or songs.json). Writes back to songs_enriched.json.
+If lastfm_genre_cache.json exists from a previous artist-only run, delete it first
+— the cache key format changed to artist|||title.
 
 Usage:
-    LASTFM_API_KEY=your_key python3 enrich_genres_lastfm.py
     python3 enrich_genres_lastfm.py --dry-run
+    python3 enrich_genres_lastfm.py
 """
 
 import json
@@ -45,7 +49,44 @@ SKIP_TAGS = {
 def normalize_artist(name: str) -> str:
     return name.lower().strip()
 
+def best_tag(tags: list, min_count: int = 5) -> str | None:
+    if isinstance(tags, dict):
+        tags = [tags]
+    for tag in tags:
+        name = tag.get("name", "").lower().strip()
+        count = int(tag.get("count", 0))
+        if count < min_count:
+            break
+        if name not in SKIP_TAGS and len(name) > 1:
+            return name
+    return None
+
+def fetch_track_genre(artist: str, title: str) -> str | None:
+    """Track-level tags — most accurate, but not always populated."""
+    params = urllib.parse.urlencode({
+        "method": "track.getTopTags",
+        "artist": artist,
+        "track": title,
+        "api_key": API_KEY,
+        "format": "json",
+        "autocorrect": 1,
+    })
+    url = f"https://ws.audioscrobbler.com/2.0/?{params}"
+    req = urllib.request.Request(url, headers={"User-Agent": "MatineeIdleArchive/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        if e.code in (400, 404):
+            return None
+        raise
+    if "error" in data:
+        return None
+    tags = data.get("toptags", {}).get("tag", [])
+    return best_tag(tags, min_count=5)
+
 def fetch_artist_genre(artist: str) -> str | None:
+    """Artist-level tags — broader but better coverage as fallback."""
     params = urllib.parse.urlencode({
         "method": "artist.getTopTags",
         "artist": artist,
@@ -62,23 +103,10 @@ def fetch_artist_genre(artist: str) -> str | None:
         if e.code in (400, 404):
             return None
         raise
-
     if "error" in data:
         return None
-
     tags = data.get("toptags", {}).get("tag", [])
-    if isinstance(tags, dict):
-        tags = [tags]
-
-    for tag in tags:
-        name = tag.get("name", "").lower().strip()
-        count = int(tag.get("count", 0))
-        if count < 10:
-            break  # tags are sorted by count desc; stop when they get sparse
-        if name not in SKIP_TAGS and len(name) > 1:
-            return name
-
-    return None
+    return best_tag(tags, min_count=10)
 
 
 def load_checkpoint() -> dict:
@@ -92,66 +120,86 @@ def save_checkpoint(cache: dict):
         json.dump(cache, f)
 
 
+def song_key(song: dict) -> str:
+    return f"{normalize_artist(song['artist'])}|||{song['title'].lower().strip()}"
+
+def artist_key(song: dict) -> str:
+    return normalize_artist(song["artist"])
+
 def main():
     src = SONGS_IN if os.path.exists(SONGS_IN) else SONGS_FALL
     print(f"Reading from: {os.path.basename(src)}")
     songs = json.load(open(src))
 
-    no_genre = [s for s in songs if not s.get("genre")]
-    unique_artists = list(dict.fromkeys(normalize_artist(s["artist"]) for s in no_genre))
-
-    print(f"Songs without genre:       {len(no_genre)}")
-    print(f"Unique artists to look up: {len(unique_artists)}")
-    print(f"Songs already have genre:  {sum(1 for s in songs if s.get('genre'))}")
+    # Enrich ALL songs — overwrite existing genres with accurate track-level data
+    print(f"Total songs:               {len(songs)}")
+    print(f"Currently have genre:      {sum(1 for s in songs if s.get('genre'))}")
 
     if DRY_RUN:
+        # Estimate unique fetches needed
+        unique_tracks  = len(set(song_key(s) for s in songs))
+        unique_artists = len(set(artist_key(s) for s in songs))
+        print(f"Unique track lookups:      {unique_tracks}")
+        print(f"Unique artist fallbacks:   {unique_artists} (only if track lookup fails)")
+        print(f"Max ETA at 4 req/sec:      ~{int(unique_tracks * RATE_LIMIT // 60)} min")
         print("\n--dry-run: exiting without fetching.")
         return
 
     cache = load_checkpoint()
-    already_cached = sum(1 for a in unique_artists if a in cache)
-    to_fetch = len(unique_artists) - already_cached
-    print(f"Cached from prior run:     {already_cached}")
-    print(f"Fetches needed:            {to_fetch}")
-    print(f"ETA at 4 req/sec:          ~{int(to_fetch * RATE_LIMIT // 60)} min\n")
+    to_fetch = [s for s in songs if song_key(s) not in cache]
+    print(f"Cached from prior run:     {len(songs) - len(to_fetch)}")
+    print(f"Track lookups needed:      {len(to_fetch)}")
+    print(f"ETA at 4 req/sec:          ~{int(len(to_fetch) * RATE_LIMIT // 60)} min\n")
+
+    # Per-artist fallback cache (populated lazily)
+    artist_cache: dict = {}
 
     fetched = 0
-    errors = 0
-    for artist in unique_artists:
-        if artist in cache:
-            continue
+    errors  = 0
+    for song in to_fetch:
+        key = song_key(song)
         try:
-            genre = fetch_artist_genre(artist)
-            cache[artist] = genre
+            # 1. Try track-specific tags first
+            genre = fetch_track_genre(song["artist"], song["title"])
+            time.sleep(RATE_LIMIT)
+
+            # 2. Fall back to artist tags if track has none
+            if not genre:
+                ak = artist_key(song)
+                if ak not in artist_cache:
+                    artist_cache[ak] = fetch_artist_genre(song["artist"])
+                    time.sleep(RATE_LIMIT)
+                genre = artist_cache[ak]
+
+            cache[key] = genre
             fetched += 1
-            if fetched % 50 == 0:
+            if fetched % 100 == 0:
                 found = sum(1 for v in cache.values() if v)
                 pct = 100 * found / len(cache) if cache else 0
                 print(f"  [{fetched:5d}] fetched  |  {found} genres found ({pct:.0f}% hit rate)  |  {errors} errors")
             if fetched % SAVE_EVERY == 0:
                 save_checkpoint(cache)
-            time.sleep(RATE_LIMIT)
         except Exception as e:
             errors += 1
-            cache[artist] = None
-            print(f"  ERROR {artist!r}: {e}")
+            cache[key] = None
+            print(f"  ERROR {song['artist']!r} — {song['title']!r}: {e}")
             time.sleep(RATE_LIMIT * 4)
 
     save_checkpoint(cache)
     print(f"\nDone fetching. {fetched} new lookups, {errors} errors.")
 
-    # Build artist -> original-case lookup for applying results
-    artist_key = {normalize_artist(s["artist"]): s["artist"] for s in songs}
-
-    applied = 0
+    applied = overridden = 0
     for song in songs:
-        if not song.get("genre"):
-            genre = cache.get(normalize_artist(song["artist"]))
-            if genre:
-                song["genre"] = genre
+        new_genre = cache.get(song_key(song))
+        if new_genre:
+            if song.get("genre") and song["genre"] != new_genre:
+                overridden += 1
+            elif not song.get("genre"):
                 applied += 1
+            song["genre"] = new_genre
 
-    print(f"Genres applied to songs:   {applied}")
+    print(f"New genres applied:        {applied}")
+    print(f"Bad genres overridden:     {overridden}")
     print(f"Total songs with genre:    {sum(1 for s in songs if s.get('genre'))} / {len(songs)}")
 
     with open(SONGS_OUT, "w") as f:
