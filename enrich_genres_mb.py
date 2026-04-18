@@ -18,9 +18,10 @@ import os
 import urllib.request
 import urllib.error
 
-SONGS_IN      = "/home/user/Matinee_Idle/songs.json"
-SONGS_OUT     = "/home/user/Matinee_Idle/songs_enriched.json"
-CHECKPOINT    = "/home/user/Matinee_Idle/mb_genre_cache.json"
+HERE          = os.path.dirname(os.path.abspath(__file__))
+SONGS_IN      = os.path.join(HERE, "songs.json")
+SONGS_OUT     = os.path.join(HERE, "songs_enriched.json")
+CHECKPOINT    = os.path.join(HERE, "mb_genre_cache.json")
 MB_BASE       = "https://musicbrainz.org/ws/2/recording"
 USER_AGENT    = "MatineeIdleArchive/1.0 ( radomski.co.nz )"
 RATE_LIMIT    = 1.1   # seconds between requests (stay under 1/sec limit)
