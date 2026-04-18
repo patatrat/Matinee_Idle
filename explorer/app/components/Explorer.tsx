@@ -61,6 +61,21 @@ export default function Explorer() {
     return Array.from(s).sort((a, b) => a - b);
   }, [songs]);
 
+  const artistCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of songs) counts[s.artist] = (counts[s.artist] ?? 0) + 1;
+    return counts;
+  }, [songs]);
+
+  const songPlayCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of songs) {
+      const key = `${s.artist}|||${s.title}`;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  }, [songs]);
+
   const genres = useMemo(() => {
     const s = new Set(songs.map((s) => s.genre).filter(Boolean) as string[]);
     return Array.from(s).sort();
@@ -309,6 +324,8 @@ export default function Explorer() {
                 <SongCard
                   key={song.id}
                   song={song}
+                  artistCount={artistCounts[song.artist] ?? 1}
+                  playCount={songPlayCounts[`${song.artist}|||${song.title}`] ?? 1}
                   onArtistClick={handleArtistClick}
                   onGenreClick={handleGenreClick}
                   onReleaseYearClick={handleReleaseYearClick}
