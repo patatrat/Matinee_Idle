@@ -44,6 +44,7 @@ export default function Explorer() {
   const [releaseYearFilter, setReleaseYearFilter] = useState<number | null>(null);
   const [yearFilter, setYearFilter] = useState<string>(ALL_YEARS);
   const [genreFilter, setGenreFilter] = useState<string>(ALL_GENRES);
+  const [sortBy, setSortBy] = useState<"date-played" | "times-played" | "date-released">("date-played");
   const [page, setPage] = useState(1);
   const [randomSong, setRandomSong] = useState<Song | null>(null);
 
@@ -110,8 +111,24 @@ export default function Explorer() {
       );
     }
 
+    if (sortBy === "date-played") {
+      result = [...result].sort((a, b) =>
+        (a.show_date ?? "").localeCompare(b.show_date ?? "")
+      );
+    } else if (sortBy === "times-played") {
+      result = [...result].sort(
+        (a, b) =>
+          (songPlayCounts[`${b.artist}|||${b.title}`] ?? 1) -
+          (songPlayCounts[`${a.artist}|||${a.title}`] ?? 1)
+      );
+    } else if (sortBy === "date-released") {
+      result = [...result].sort(
+        (a, b) => (a.release_year ?? 9999) - (b.release_year ?? 9999)
+      );
+    }
+
     return result;
-  }, [songs, query, artistFilter, releaseYearFilter, yearFilter, genreFilter]);
+  }, [songs, query, artistFilter, releaseYearFilter, yearFilter, genreFilter, sortBy, songPlayCounts]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -217,6 +234,17 @@ export default function Explorer() {
                 {g}
               </option>
             ))}
+          </select>
+
+          {/* Sort */}
+          <select
+            value={sortBy}
+            onChange={(e) => { setSortBy(e.target.value as typeof sortBy); setPage(1); }}
+            className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-neutral-500 cursor-pointer"
+          >
+            <option value="date-played">Date played</option>
+            <option value="times-played">Times played</option>
+            <option value="date-released">Date released</option>
           </select>
 
           {/* Random */}
