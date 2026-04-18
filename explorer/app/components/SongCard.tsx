@@ -16,13 +16,26 @@ function formatAirDate(song: Song): string {
   return song.show_date.replace(/^Matinee Idle for\s*/i, "");
 }
 
+function Count({ n, title }: { n: number; title: string }) {
+  if (n <= 1) return null;
+  return (
+    <span title={title} className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-neutral-800 text-neutral-500 leading-none select-none">
+      {n}
+    </span>
+  );
+}
+
 export default function SongCard({
   song,
+  artistCount,
+  playCount,
   onArtistClick,
   onGenreClick,
   onReleaseYearClick,
 }: {
   song: Song;
+  artistCount: number;
+  playCount: number;
   onArtistClick: (artist: string) => void;
   onGenreClick: (genre: string) => void;
   onReleaseYearClick: (year: number) => void;
@@ -38,17 +51,19 @@ export default function SongCard({
 
       {/* Main info */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => onArtistClick(song.artist)}
             className="font-semibold text-white text-sm leading-snug hover:text-neutral-300 hover:underline transition-colors text-left"
           >
             {song.artist}
           </button>
+          <Count n={artistCount} title={`${artistCount} songs by this artist`} />
           <span className="text-neutral-500 text-xs">—</span>
           <span className="text-neutral-300 text-sm leading-snug">
             {song.title}
           </span>
+          <Count n={playCount} title={`Played ${playCount} times on the show`} />
         </div>
         <div className="mt-0.5 flex items-center gap-2 flex-wrap text-xs text-neutral-600">
           <span>Played {formatAirDate(song)}</span>
