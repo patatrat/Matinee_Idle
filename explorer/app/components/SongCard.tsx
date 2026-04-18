@@ -70,6 +70,8 @@ export default function SongCard({
   }, [song.spotify_url]);
 
   async function handleSpotifyClick() {
+    if (spotifyState === "loading") return;
+
     // Already have URL — open it
     if (song.spotify_url) {
       window.open(song.spotify_url, "_blank", "noopener,noreferrer");
@@ -93,7 +95,8 @@ export default function SongCard({
         return;
       }
       if (!resp.ok) {
-        // 429 rate limit, 500 error, network failure — all retryable
+        // 429 rate limit, 500 auth/server error — open search fallback
+        openSpotifySearch();
         setSpotifyState("error");
         return;
       }
@@ -104,14 +107,20 @@ export default function SongCard({
       setSpotifyState("found");
       window.open(url, "_blank", "noopener,noreferrer");
     } catch {
+      openSpotifySearch();
       setSpotifyState("error");
     }
+  }
+
+  function openSpotifySearch() {
+    const q = encodeURIComponent(`${song.artist} ${song.title}`);
+    window.open(`https://open.spotify.com/search/${q}`, "_blank", "noopener,noreferrer");
   }
 
   const spotifyTitle =
     spotifyState === "loading" ? "Searching Spotify…" :
     spotifyState === "not_found" ? "Not found on Spotify" :
-    spotifyState === "error" ? "Search failed — click to retry" :
+    spotifyState === "error" ? "Opened Spotify search (API unavailable) — click to retry" :
     "Open in Spotify";
 
   const spotifyColor =
