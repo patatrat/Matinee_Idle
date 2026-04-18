@@ -1,7 +1,10 @@
 import gzip
 import json
+import os
 import re
 import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 COLUMNS = [
     "show_date", "artist", "title", "broadcast_date",
@@ -32,7 +35,13 @@ def parse_val(v):
 songs = []
 in_copy = False
 
-with gzip.open("/home/user/Matinee_Idle/db_cluster-17-01-2026@14-00-50.backup.gz", "rt", encoding="utf-8", errors="replace") as f:
+backups = [f for f in os.listdir(HERE) if f.endswith(".backup.gz")]
+if not backups:
+    sys.exit(f"ERROR: no .backup.gz file found in {HERE}")
+backup_path = os.path.join(HERE, sorted(backups)[-1])
+print(f"Using backup: {backup_path}", file=sys.stderr)
+
+with gzip.open(backup_path, "rt", encoding="utf-8", errors="replace") as f:
     for line in f:
         if line.startswith("COPY public.songs "):
             in_copy = True
@@ -73,7 +82,7 @@ songs.sort(key=lambda s: (s.get("broadcast_date") or "", s.get("id", 0)))
 
 print(f"Extracted {len(songs)} songs", file=sys.stderr)
 
-out_path = "/home/user/Matinee_Idle/songs.json"
+out_path = os.path.join(HERE, "songs.json")
 with open(out_path, "w") as f:
     json.dump(songs, f, separators=(",", ":"))
 
