@@ -35,14 +35,31 @@ DRY_RUN    = "--dry-run" in sys.argv
 
 # Tags that aren't useful genre labels
 SKIP_TAGS = {
+    # personal/fan tags
     "seen live", "favorites", "favourite", "love", "awesome", "beautiful",
     "sexy", "cool", "amazing", "best", "classic", "all", "good", "great",
-    "under 2000 listeners", "under 5000 listeners",
-    "male vocalists", "female vocalists", "male vocalist", "female vocalist",
-    "singer-songwriter",  # keep this actually - it's useful
-    "albums i own", "my favorites", "to listen", "wishlist",
+    "under 2000 listeners", "under 5000 listeners", "bestest", "cuzz cuzz",
+    "cowhat fav", "cute", "cute boys and girls", "7 of 10 stars", "camp",
+    "campy", "cob", "cover", "best of 2012", "blank and the blanks",
+    "blondes bombshells", "allboutguitarcom", "albums i own", "my favorites",
+    "to listen", "wishlist",
+    # era/decade tags (release_year field already captures this)
+    "40s", "50s", "60s", "60's", "70s", "70's", "80s", "80ies", "90s",
+    "1920s", "1930s", "1940s", "1950s", "1960s", "1970s", "1980s", "1990s",
+    "2000s", "2010s",
+    # occupations/descriptors
+    "actor", "actress", "celebrity", "comedian", "comedians", "composer",
+    "singer-songwriter",
+    # locations/nationalities
     "new zealand", "australia", "uk", "usa", "american", "british",
     "canadian", "australian", "german", "french", "swedish", "japanese",
+    "arabic", "belgian", "burgenland", "chinese", "czech", "aussie",
+    "british-american", "australian aboriginal",
+    # location tags
+    "bay area", "canada", "canberra indie", "bbc", "american idol",
+    # person name tags
+    "barbra streisand", "brian wilson",
+    # source tags
     "heard on matinee idle", "rnz", "radio nz",
 }
 
