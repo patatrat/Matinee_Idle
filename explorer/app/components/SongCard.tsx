@@ -9,7 +9,6 @@ function formatAirDate(song: Song): string {
       { day: "numeric", month: "short", year: "numeric" }
     );
   }
-  // Extract readable date from show_date text
   const match = song.show_date.match(
     /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+(.+)/i
   );
@@ -17,7 +16,13 @@ function formatAirDate(song: Song): string {
   return song.show_date.replace(/^Matinee Idle for\s*/i, "");
 }
 
-export default function SongCard({ song }: { song: Song }) {
+export default function SongCard({
+  song,
+  onArtistClick,
+}: {
+  song: Song;
+  onArtistClick: (artist: string) => void;
+}) {
   return (
     <div className="group flex items-start gap-4 rounded-lg px-4 py-3 hover:bg-neutral-900 transition-colors">
       {/* Year badge */}
@@ -30,26 +35,29 @@ export default function SongCard({ song }: { song: Song }) {
       {/* Main info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="font-semibold text-white text-sm leading-snug">
+          <button
+            onClick={() => onArtistClick(song.artist)}
+            className="font-semibold text-white text-sm leading-snug hover:text-neutral-300 hover:underline transition-colors text-left"
+          >
             {song.artist}
-          </span>
+          </button>
           <span className="text-neutral-500 text-xs">—</span>
           <span className="text-neutral-300 text-sm leading-snug">
             {song.title}
           </span>
         </div>
         <div className="mt-0.5 flex items-center gap-2 flex-wrap text-xs text-neutral-600">
-          <span>{formatAirDate(song)}</span>
+          <span>Played {formatAirDate(song)}</span>
+          {song.release_year && (
+            <>
+              <span>·</span>
+              <span>Released {song.release_year}</span>
+            </>
+          )}
           {song.mb_release && (
             <>
               <span>·</span>
               <span className="italic">{song.mb_release}</span>
-            </>
-          )}
-          {song.release_year && (
-            <>
-              <span>·</span>
-              <span>{song.release_year}</span>
             </>
           )}
           {song.genre && (
