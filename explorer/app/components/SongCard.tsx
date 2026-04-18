@@ -19,9 +19,13 @@ function formatAirDate(song: Song): string {
 export default function SongCard({
   song,
   onArtistClick,
+  onGenreClick,
+  onReleaseYearClick,
 }: {
   song: Song;
   onArtistClick: (artist: string) => void;
+  onGenreClick: (genre: string) => void;
+  onReleaseYearClick: (year: number) => void;
 }) {
   return (
     <div className="group flex items-start gap-4 rounded-lg px-4 py-3 hover:bg-neutral-900 transition-colors">
@@ -51,7 +55,12 @@ export default function SongCard({
           {song.release_year && (
             <>
               <span>·</span>
-              <span>Released {song.release_year}</span>
+              <button
+                onClick={() => onReleaseYearClick(song.release_year!)}
+                className="hover:text-neutral-400 hover:underline transition-colors"
+              >
+                Released {song.release_year}
+              </button>
             </>
           )}
           {song.mb_release && (
@@ -63,7 +72,12 @@ export default function SongCard({
           {song.genre && (
             <>
               <span>·</span>
-              <span className="text-neutral-500">{song.genre}</span>
+              <button
+                onClick={() => onGenreClick(song.genre!)}
+                className="hover:text-neutral-400 hover:underline transition-colors"
+              >
+                {song.genre}
+              </button>
             </>
           )}
         </div>

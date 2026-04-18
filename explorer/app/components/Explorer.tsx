@@ -27,11 +27,21 @@ function normalize(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+function Pill({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 px-3 py-1 text-xs text-white">
+      {children}
+      <button onClick={onRemove} className="text-neutral-500 hover:text-white transition-colors" aria-label="Remove filter">×</button>
+    </span>
+  );
+}
+
 export default function Explorer() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [artistFilter, setArtistFilter] = useState<string>("");
+  const [releaseYearFilter, setReleaseYearFilter] = useState<number | null>(null);
   const [yearFilter, setYearFilter] = useState<string>(ALL_YEARS);
   const [genreFilter, setGenreFilter] = useState<string>(ALL_GENRES);
   const [page, setPage] = useState(1);
@@ -71,6 +81,10 @@ export default function Explorer() {
       result = result.filter((s) => s.artist === artistFilter);
     }
 
+    if (releaseYearFilter !== null) {
+      result = result.filter((s) => s.release_year === releaseYearFilter);
+    }
+
     if (query.trim()) {
       const q = normalize(query);
       result = result.filter(
@@ -82,7 +96,7 @@ export default function Explorer() {
     }
 
     return result;
-  }, [songs, query, artistFilter, yearFilter, genreFilter]);
+  }, [songs, query, artistFilter, releaseYearFilter, yearFilter, genreFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -106,9 +120,20 @@ export default function Explorer() {
     setPage(1);
   }, []);
 
+  const handleGenreClick = useCallback((genre: string) => {
+    setGenreFilter(genre);
+    setPage(1);
+  }, []);
+
+  const handleReleaseYearClick = useCallback((year: number) => {
+    setReleaseYearFilter(year);
+    setPage(1);
+  }, []);
+
   const activeFilters =
     (query ? 1 : 0) +
     (artistFilter ? 1 : 0) +
+    (releaseYearFilter !== null ? 1 : 0) +
     (yearFilter !== ALL_YEARS ? 1 : 0) +
     (genreFilter !== ALL_GENRES ? 1 : 0);
 
@@ -195,14 +220,10 @@ export default function Explorer() {
           <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 flex-wrap">
               {artistFilter && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 px-3 py-1 text-xs text-white">
-                  {artistFilter}
-                  <button
-                    onClick={() => { setArtistFilter(""); setPage(1); }}
-                    className="text-neutral-500 hover:text-white transition-colors"
-                    aria-label="Remove artist filter"
-                  >×</button>
-                </span>
+                <Pill onRemove={() => { setArtistFilter(""); setPage(1); }}>{artistFilter}</Pill>
+              )}
+              {releaseYearFilter !== null && (
+                <Pill onRemove={() => { setReleaseYearFilter(null); setPage(1); }}>Released {releaseYearFilter}</Pill>
               )}
               <p className="text-xs text-neutral-500">
                 {activeFilters > 0 ? (
@@ -223,6 +244,7 @@ export default function Explorer() {
                 onClick={() => {
                   setQuery("");
                   setArtistFilter("");
+                  setReleaseYearFilter(null);
                   setYearFilter(ALL_YEARS);
                   setGenreFilter(ALL_GENRES);
                   setPage(1);
@@ -284,7 +306,13 @@ export default function Explorer() {
           ) : (
             <div className="grid gap-2">
               {paginated.map((song) => (
-                <SongCard key={song.id} song={song} onArtistClick={handleArtistClick} />
+                <SongCard
+                  key={song.id}
+                  song={song}
+                  onArtistClick={handleArtistClick}
+                  onGenreClick={handleGenreClick}
+                  onReleaseYearClick={handleReleaseYearClick}
+                />
               ))}
             </div>
           )}
