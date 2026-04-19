@@ -1,6 +1,8 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Song } from "./Explorer";
+import { GENRE_CONFIG, FALLBACK_BAR } from "../lib/genres";
 
 function formatAirDate(song: Song): string {
   if (song.broadcast_date) {
@@ -20,10 +22,16 @@ function Count({ n, title }: { n: number; title: string }) {
   if (n <= 1) return null;
   return (
     <span title={title} className="inline-block rounded px-1.5 py-0.5 text-[10px] font-medium bg-neutral-800 text-neutral-500 leading-none select-none">
-      {n}
+      ×{n}
     </span>
   );
 }
+
+function cacheKey(artist: string, title: string) {
+  return `matinee-spotify:${artist.toLowerCase()}|||${title.toLowerCase()}`;
+}
+
+type SpotifyState = "idle" | "loading" | "found" | "not_found" | "error";
 
 export default function SongCard({
   song,
@@ -32,6 +40,7 @@ export default function SongCard({
   onArtistClick,
   onGenreClick,
   onReleaseYearClick,
+  onSpotifyResult,
 }: {
   song: Song;
   artistCount: number;
@@ -39,80 +48,185 @@ export default function SongCard({
   onArtistClick: (artist: string) => void;
   onGenreClick: (genre: string) => void;
   onReleaseYearClick: (year: number) => void;
+  onSpotifyResult: (artist: string, title: string, url: string) => void;
 }) {
-  return (
-    <div className="group flex items-start gap-4 rounded-lg px-4 py-3 hover:bg-neutral-900 transition-colors">
-      {/* Year badge */}
-      <div className="shrink-0 w-10 text-center mt-0.5">
-        <span className="text-xs font-mono text-neutral-600 group-hover:text-neutral-500 transition-colors">
-          {song.air_year ?? "—"}
-        </span>
-      </div>
+  const [spotifyState, setSpotifyState] = useState<SpotifyState>(
+    song.spotify_url ? "found" : "idle"
+  );
+  const [showEmbed, setShowEmbed] = useState(false);
 
-      {/* Main info */}
+  useEffect(() => {
+    if (song.spotify_url) return;
+    const cached = localStorage.getItem(cacheKey(song.artist, song.title));
+    if (cached) {
+      onSpotifyResult(song.artist, song.title, cached);
+      setSpotifyState("found");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (song.spotify_url) setSpotifyState("found");
+  }, [song.spotify_url]);
+
+  function openSpotifySearch() {
+    const q = encodeURIComponent(`${song.artist} ${song.title}`);
+    window.open(`https://open.spotify.com/search/${q}`, "_blank", "noopener,noreferrer");
+  }
+
+  async function handleSpotifyClick() {
+    if (spotifyState === "loading") return;
+
+    if (song.spotify_url) {
+      setShowEmbed((v) => !v);
+      return;
+    }
+
+    const cached = localStorage.getItem(cacheKey(song.artist, song.title));
+    if (cached) {
+      window.open(cached, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    setSpotifyState("loading");
+    try {
+      const params = new URLSearchParams({ artist: song.artist, title: song.title });
+      const resp = await fetch(`/api/spotify?${params}`);
+      if (resp.status === 404) {
+        setSpotifyState("not_found");
+        return;
+      }
+      if (!resp.ok) {
+        openSpotifySearch();
+        setSpotifyState("error");
+        return;
+      }
+      const data = await resp.json();
+      const url: string = data.spotify_url;
+      localStorage.setItem(cacheKey(song.artist, song.title), url);
+      onSpotifyResult(song.artist, song.title, url);
+      setSpotifyState("found");
+      setShowEmbed(true);
+    } catch {
+      openSpotifySearch();
+      setSpotifyState("error");
+    }
+  }
+
+  const genreBar = song.genre ? (GENRE_CONFIG[song.genre]?.bar ?? FALLBACK_BAR) : FALLBACK_BAR;
+  const genrePill = song.genre ? GENRE_CONFIG[song.genre]?.pill : undefined;
+
+  const spotifyTitle =
+    spotifyState === "loading"   ? "Searching Spotify…" :
+    spotifyState === "not_found" ? "Not found on Spotify" :
+    spotifyState === "error"     ? "Search failed — click to retry" :
+    song.spotify_url             ? (showEmbed ? "Hide player" : "Show player") :
+    "Find on Spotify";
+
+  const spotifyIconColor =
+    spotifyState === "found"     ? "text-green-400 hover:text-green-300" :
+    spotifyState === "not_found" ? "text-neutral-700 cursor-not-allowed" :
+    spotifyState === "loading"   ? "text-neutral-600" :
+    spotifyState === "error"     ? "text-amber-500 hover:text-amber-400" :
+    "text-neutral-500 hover:text-green-400";
+
+  const trackId = song.spotify_url?.split("/track/")[1]?.split("?")[0];
+
+  return (
+    <div className="group flex gap-3 rounded-xl px-3 py-3 hover:bg-neutral-900 transition-colors">
+      {/* Genre colour bar */}
+      <div className={`w-1 self-stretch rounded-full shrink-0 ${genreBar} opacity-70 group-hover:opacity-100 transition-opacity`} />
+
+      {/* Main content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Row 1: Artist + count badge */}
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={() => onArtistClick(song.artist)}
-            className="font-semibold text-white text-sm leading-snug hover:text-neutral-300 hover:underline transition-colors text-left"
+            className="text-sm font-semibold text-neutral-400 hover:text-neutral-200 hover:underline transition-colors text-left leading-snug"
           >
             {song.artist}
           </button>
           <Count n={artistCount} title={`${artistCount} songs by this artist`} />
-          <span className="text-neutral-500 text-xs">—</span>
-          <span className="text-neutral-300 text-sm leading-snug">
+        </div>
+
+        {/* Row 2: Title (clickable → Spotify) + play count */}
+        <div className="flex items-center gap-2 flex-wrap mt-0.5">
+          <button
+            onClick={handleSpotifyClick}
+            title={spotifyTitle}
+            className="text-base font-medium text-neutral-100 hover:underline text-left leading-snug"
+          >
             {song.title}
-          </span>
+          </button>
           <Count n={playCount} title={`Played ${playCount} times on the show`} />
         </div>
-        <div className="mt-0.5 flex items-center gap-2 flex-wrap text-xs text-neutral-600">
-          <span>Played {formatAirDate(song)}</span>
+
+        {/* Row 3: Metadata */}
+        <div className="mt-1 flex items-center gap-2 flex-wrap text-xs text-neutral-600">
+          {song.mb_release && (
+            <span className="italic">{song.mb_release}</span>
+          )}
           {song.release_year && (
             <>
-              <span>·</span>
+              {song.mb_release && <span>·</span>}
               <button
                 onClick={() => onReleaseYearClick(song.release_year!)}
                 className="hover:text-neutral-400 hover:underline transition-colors"
               >
-                Released {song.release_year}
+                {song.release_year}
               </button>
             </>
           )}
-          {song.mb_release && (
-            <>
-              <span>·</span>
-              <span className="italic">{song.mb_release}</span>
-            </>
-          )}
-          {song.genre && (
+          <span>·</span>
+          <span>{formatAirDate(song)}</span>
+          {song.genre && genrePill && (
             <>
               <span>·</span>
               <button
                 onClick={() => onGenreClick(song.genre!)}
-                className="hover:text-neutral-400 hover:underline transition-colors"
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium leading-none transition-opacity hover:opacity-80 ${genrePill}`}
               >
                 {song.genre}
               </button>
             </>
           )}
         </div>
+
+        {/* Spotify embed */}
+        {showEmbed && trackId && (
+          <div className="mt-2">
+            <iframe
+              src={`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`}
+              width="100%"
+              height="80"
+              frameBorder="0"
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
+              className="rounded-lg"
+            />
+          </div>
+        )}
       </div>
 
-      {/* Spotify link */}
-      {song.spotify_url && (
-        <a
-          href={song.spotify_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="shrink-0 text-neutral-700 hover:text-green-400 transition-colors opacity-0 group-hover:opacity-100"
-          aria-label="Open in Spotify"
-          title="Open in Spotify"
-        >
+      {/* Spotify icon button */}
+      <button
+        onClick={handleSpotifyClick}
+        disabled={spotifyState === "loading" || spotifyState === "not_found"}
+        className={`shrink-0 mt-1 transition-colors ${spotifyIconColor}`}
+        aria-label={spotifyTitle}
+        title={spotifyTitle}
+      >
+        {spotifyState === "loading" ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="animate-spin">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="40 20" />
+          </svg>
+        ) : (
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
           </svg>
-        </a>
-      )}
+        )}
+      </button>
     </div>
   );
 }

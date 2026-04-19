@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import SongCard from "./SongCard";
+import FilterSidebar from "./FilterSidebar";
 
 export interface Song {
   id: string;
@@ -19,9 +20,21 @@ export interface Song {
   release_year: number | null;
 }
 
+type SortBy = "date-played" | "times-played" | "date-released";
+
 const PAGE_SIZE = 50;
-const ALL_YEARS = "all";
-const ALL_GENRES = "all";
+
+const DECADES: { label: string; lo: number; hi: number }[] = [
+  { label: "Pre-50s", lo: 0,    hi: 1949 },
+  { label: "50s",     lo: 1950, hi: 1959 },
+  { label: "60s",     lo: 1960, hi: 1969 },
+  { label: "70s",     lo: 1970, hi: 1979 },
+  { label: "80s",     lo: 1980, hi: 1989 },
+  { label: "90s",     lo: 1990, hi: 1999 },
+  { label: "00s",     lo: 2000, hi: 2009 },
+  { label: "10s",     lo: 2010, hi: 2019 },
+  { label: "20s+",    lo: 2020, hi: 9999 },
+];
 
 function normalize(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -39,14 +52,20 @@ function Pill({ children, onRemove }: { children: React.ReactNode; onRemove: () 
 export default function Explorer() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filters
   const [query, setQuery] = useState("");
-  const [artistFilter, setArtistFilter] = useState<string>("");
+  const [artistFilter, setArtistFilter] = useState("");
+  const [yearFilter, setYearFilter] = useState("all");
+  const [decadeFilter, setDecadeFilter] = useState<number | null>(null);
   const [releaseYearFilter, setReleaseYearFilter] = useState<number | null>(null);
-  const [yearFilter, setYearFilter] = useState<string>(ALL_YEARS);
-  const [genreFilter, setGenreFilter] = useState<string>(ALL_GENRES);
-  const [sortBy, setSortBy] = useState<"date-played" | "times-played" | "date-released">("date-played");
+  const [genreFilters, setGenreFilters] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<SortBy>("date-played");
   const [page, setPage] = useState(1);
+
+  // UI state
   const [randomSong, setRandomSong] = useState<Song | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     fetch("/songs.json")
@@ -77,30 +96,31 @@ export default function Explorer() {
     return counts;
   }, [songs]);
 
-  const genres = useMemo(() => {
-    const s = new Set(songs.map((s) => s.genre).filter(Boolean) as string[]);
-    return Array.from(s).sort();
-  }, [songs]);
+  const uniqueArtists = useMemo(() => Object.keys(artistCounts).length, [artistCounts]);
 
   const filtered = useMemo(() => {
     let result = songs;
 
-    if (yearFilter !== ALL_YEARS) {
+    if (yearFilter !== "all") {
       result = result.filter((s) => s.air_year === parseInt(yearFilter));
     }
-
-    if (genreFilter !== ALL_GENRES) {
-      result = result.filter((s) => s.genre === genreFilter);
+    if (genreFilters.size > 0) {
+      result = result.filter((s) => s.genre != null && genreFilters.has(s.genre));
     }
-
-    if (artistFilter) {
-      result = result.filter((s) => s.artist === artistFilter);
+    if (artistFilter.trim()) {
+      const af = normalize(artistFilter);
+      result = result.filter((s) => normalize(s.artist).includes(af));
     }
-
     if (releaseYearFilter !== null) {
       result = result.filter((s) => s.release_year === releaseYearFilter);
+    } else if (decadeFilter !== null) {
+      const decade = DECADES.find((d) => d.lo === decadeFilter);
+      if (decade) {
+        result = result.filter(
+          (s) => s.release_year != null && s.release_year >= decade.lo && s.release_year <= decade.hi
+        );
+      }
     }
-
     if (query.trim()) {
       const q = normalize(query);
       result = result.filter(
@@ -112,9 +132,7 @@ export default function Explorer() {
     }
 
     if (sortBy === "date-played") {
-      result = [...result].sort((a, b) =>
-        (a.show_date ?? "").localeCompare(b.show_date ?? "")
-      );
+      result = [...result].sort((a, b) => (a.show_date ?? "").localeCompare(b.show_date ?? ""));
     } else if (sortBy === "times-played") {
       result = [...result].sort(
         (a, b) =>
@@ -122,29 +140,32 @@ export default function Explorer() {
           (songPlayCounts[`${a.artist}|||${a.title}`] ?? 1)
       );
     } else if (sortBy === "date-released") {
-      result = [...result].sort(
-        (a, b) => (a.release_year ?? 9999) - (b.release_year ?? 9999)
-      );
+      result = [...result].sort((a, b) => (a.release_year ?? 9999) - (b.release_year ?? 9999));
     }
 
     return result;
-  }, [songs, query, artistFilter, releaseYearFilter, yearFilter, genreFilter, sortBy, songPlayCounts]);
+  }, [songs, query, artistFilter, releaseYearFilter, decadeFilter, yearFilter, genreFilters, sortBy, songPlayCounts]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const handleFilterChange = useCallback(
-    (setter: (v: string) => void) => (v: string) => {
-      setter(v);
-      setPage(1);
-    },
-    []
-  );
+  const activeFilterCount =
+    (query ? 1 : 0) +
+    (artistFilter ? 1 : 0) +
+    (releaseYearFilter !== null ? 1 : 0) +
+    (decadeFilter !== null ? 1 : 0) +
+    (yearFilter !== "all" ? 1 : 0) +
+    genreFilters.size;
 
-  const pickRandom = () => {
-    const pool = filtered.length > 0 ? filtered : songs;
-    setRandomSong(pool[Math.floor(Math.random() * pool.length)]);
-  };
+  const handleClearAll = useCallback(() => {
+    setQuery("");
+    setArtistFilter("");
+    setReleaseYearFilter(null);
+    setDecadeFilter(null);
+    setYearFilter("all");
+    setGenreFilters(new Set());
+    setPage(1);
+  }, []);
 
   const handleArtistClick = useCallback((artist: string) => {
     setArtistFilter(artist);
@@ -153,250 +174,310 @@ export default function Explorer() {
   }, []);
 
   const handleGenreClick = useCallback((genre: string) => {
-    setGenreFilter(genre);
+    setGenreFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(genre)) next.delete(genre); else next.add(genre);
+      return next;
+    });
     setPage(1);
   }, []);
 
   const handleReleaseYearClick = useCallback((year: number) => {
     setReleaseYearFilter(year);
+    setDecadeFilter(null);
     setPage(1);
   }, []);
 
-  const activeFilters =
-    (query ? 1 : 0) +
-    (artistFilter ? 1 : 0) +
-    (releaseYearFilter !== null ? 1 : 0) +
-    (yearFilter !== ALL_YEARS ? 1 : 0) +
-    (genreFilter !== ALL_GENRES ? 1 : 0);
+  const handleGenreToggle = useCallback((genre: string) => {
+    setGenreFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(genre)) next.delete(genre); else next.add(genre);
+      return next;
+    });
+    setPage(1);
+  }, []);
+
+  const handleDecadeChange = useCallback((lo: number | null) => {
+    setDecadeFilter(lo);
+    setReleaseYearFilter(null);
+    setPage(1);
+  }, []);
+
+  const handleSpotifyResult = useCallback((artist: string, title: string, url: string) => {
+    setSongs((prev) =>
+      prev.map((s) =>
+        s.artist === artist && s.title === title ? { ...s, spotify_url: url } : s
+      )
+    );
+  }, []);
+
+  const pickRandom = useCallback(() => {
+    const pool = filtered.length > 0 ? filtered : songs;
+    setRandomSong(pool[Math.floor(Math.random() * pool.length)]);
+  }, [filtered, songs]);
+
+  // Spotify search link for the filtered view
+  const spotifySearchUrl = useMemo(() => {
+    const parts: string[] = [];
+    if (genreFilters.size === 1) parts.push(`genre:${[...genreFilters][0]}`);
+    if (yearFilter !== "all") parts.push(`year:${yearFilter}`);
+    if (decadeFilter !== null) {
+      const d = DECADES.find((d) => d.lo === decadeFilter);
+      if (d && d.hi < 9999) parts.push(`year:${d.lo}-${d.hi}`);
+    }
+    if (artistFilter) parts.push(artistFilter);
+    if (query) parts.push(query);
+    const q = parts.length ? parts.join(" ") : "matinee idle radio new zealand";
+    return `https://open.spotify.com/search/${encodeURIComponent(q)}`;
+  }, [genreFilters, yearFilter, decadeFilter, artistFilter, query]);
+
+  const spotifyWithLinks = useMemo(
+    () => filtered.filter((s) => s.spotify_url).length,
+    [filtered]
+  );
+
+  const sidebarProps = {
+    query, onQueryChange: (v: string) => { setQuery(v); setPage(1); },
+    artistFilter, onArtistChange: (v: string) => { setArtistFilter(v); setPage(1); },
+    yearFilter, onYearChange: (v: string) => { setYearFilter(v); setPage(1); },
+    years,
+    decadeFilter, onDecadeChange: handleDecadeChange,
+    genreFilters, onGenreToggle: handleGenreToggle,
+    sortBy, onSortChange: (v: SortBy) => { setSortBy(v); setPage(1); },
+    onRandom: pickRandom,
+    onClearAll: handleClearAll,
+    activeFilterCount,
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="border-b border-neutral-800 px-4 py-6 sm:px-8">
-        <div className="max-w-6xl mx-auto">
+      <header className="border-t-2 border-amber-500 border-b border-b-neutral-800">
+        <div className="max-w-7xl mx-auto px-6 py-5">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                Matinee Idle Archive
-              </h1>
-              <p className="mt-1 text-sm text-neutral-400">
-                21 years of Radio New Zealand's legendary summer music show
-                &mdash; hosted by Phil O'Brien &amp; Simon Morris
+              <div className="flex items-center gap-2">
+                {/* Radio tower icon */}
+                <svg className="text-amber-400 shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M4.929 2.515a1 1 0 0 0-1.414 1.414L5.05 5.464A9.956 9.956 0 0 0 2 12c0 2.4.847 4.604 2.25 6.33l-1.775 1.775a1 1 0 1 0 1.414 1.414L5.71 19.7A9.956 9.956 0 0 0 12 22a9.956 9.956 0 0 0 6.29-2.3l1.82 1.819a1 1 0 1 0 1.414-1.414L19.75 18.33A9.956 9.956 0 0 0 22 12a9.956 9.956 0 0 0-3.05-7.064l1.535-1.535a1 1 0 0 0-1.414-1.414l-1.64 1.639A9.955 9.955 0 0 0 12 2a9.955 9.955 0 0 0-5.431 1.626L4.93 2.515zM12 4a8 8 0 1 1 0 16A8 8 0 0 1 12 4zm0 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+                </svg>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                  Matinee Idle Archive
+                </h1>
+              </div>
+              <p className="mt-1 text-[11px] text-neutral-500 tracking-widest uppercase">
+                Radio New Zealand · Phil O&apos;Brien &amp; Simon Morris · 2005–2026
               </p>
             </div>
             {!loading && (
-              <p className="text-sm text-neutral-500 shrink-0">
-                {songs.length.toLocaleString()} songs &middot; 2005–2026
-              </p>
+              <div className="hidden sm:flex items-center gap-2 shrink-0">
+                <span className="bg-neutral-900 border border-neutral-800 rounded-full px-3 py-1 text-xs text-neutral-500">
+                  {songs.length.toLocaleString()} plays
+                </span>
+                <span className="bg-neutral-900 border border-neutral-800 rounded-full px-3 py-1 text-xs text-neutral-500">
+                  {uniqueArtists.toLocaleString()} artists
+                </span>
+              </div>
             )}
           </div>
         </div>
       </header>
 
-      {/* Filters */}
-      <div className="border-b border-neutral-800 px-4 py-4 sm:px-8 bg-neutral-900/50">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row gap-3">
-          {/* Search */}
-          <input
-            type="search"
-            placeholder="Search artist, title, album…"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(1);
-            }}
-            className="flex-1 min-w-0 rounded-lg bg-neutral-800 border border-neutral-700 px-4 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
-          />
+      {/* Body: sidebar + content */}
+      <div className="flex-1 flex flex-col lg:flex-row max-w-7xl w-full mx-auto">
 
-          {/* Year played */}
-          <select
-            value={yearFilter}
-            onChange={(e) => handleFilterChange(setYearFilter)(e.target.value)}
-            className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-neutral-500 cursor-pointer"
-          >
-            <option value={ALL_YEARS}>Year played (all)</option>
-            {years.map((y) => (
-              <option key={y} value={y}>
-                Played in {y}
-              </option>
-            ))}
-          </select>
+        {/* ── Desktop sidebar ── */}
+        <aside className="hidden lg:block w-64 shrink-0 border-r border-neutral-800 sticky top-0 h-screen overflow-y-auto sidebar-scroll">
+          <FilterSidebar {...sidebarProps} />
+        </aside>
 
-          {/* Genre */}
-          <select
-            value={genreFilter}
-            onChange={(e) => handleFilterChange(setGenreFilter)(e.target.value)}
-            className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-neutral-500 cursor-pointer"
-          >
-            <option value={ALL_GENRES}>All genres</option>
-            {genres.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
+        {/* ── Content column ── */}
+        <div className="flex-1 flex flex-col min-w-0">
 
-          {/* Sort */}
-          <select
-            value={sortBy}
-            onChange={(e) => { setSortBy(e.target.value as typeof sortBy); setPage(1); }}
-            className="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-neutral-500 cursor-pointer"
-          >
-            <option value="date-played">Date played</option>
-            <option value="times-played">Times played</option>
-            <option value="date-released">Date released</option>
-          </select>
-
-          {/* Random */}
-          <button
-            onClick={pickRandom}
-            className="rounded-lg bg-neutral-800 border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-700 hover:text-white transition-colors whitespace-nowrap"
-          >
-            ⚄ Random
-          </button>
-        </div>
-      </div>
-
-      {/* Results summary */}
-      {!loading && (
-        <div className="px-4 py-2 sm:px-8">
-          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              {artistFilter && (
-                <Pill onRemove={() => { setArtistFilter(""); setPage(1); }}>{artistFilter}</Pill>
+          {/* Mobile: search + filter toggle */}
+          <div className="lg:hidden border-b border-neutral-800 px-4 py-3 flex gap-2">
+            <input
+              type="search"
+              placeholder="Search artist, title, album…"
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+              className="flex-1 min-w-0 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-600"
+            />
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              className="shrink-0 flex items-center gap-1.5 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm text-neutral-400 hover:text-white transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="bg-amber-500 text-black text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                  {activeFilterCount}
+                </span>
               )}
-              {releaseYearFilter !== null && (
-                <Pill onRemove={() => { setReleaseYearFilter(null); setPage(1); }}>Released {releaseYearFilter}</Pill>
-              )}
-              <p className="text-xs text-neutral-500">
-                {activeFilters > 0 ? (
-                  <>
-                    <span className="text-neutral-300">
-                      {filtered.length.toLocaleString()}
-                    </span>{" "}
-                    result{filtered.length !== 1 ? "s" : ""}
-                    {totalPages > 1 && <> &middot; page {page} of {totalPages}</>}
-                  </>
-                ) : (
-                  <>Showing {paginated.length} of {songs.length.toLocaleString()} songs</>
+            </button>
+          </div>
+
+          {/* Mobile filter drawer */}
+          <div
+            className={`lg:hidden border-b border-neutral-800 overflow-hidden transition-all duration-300 ${
+              sidebarOpen ? "max-h-[80vh] overflow-y-auto sidebar-scroll" : "max-h-0"
+            }`}
+          >
+            <FilterSidebar {...sidebarProps} />
+            <div className="px-4 pb-4">
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="w-full rounded-lg border border-neutral-700 py-2 text-sm text-neutral-400 hover:text-white transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+
+          {/* Results summary + active pills */}
+          {!loading && (
+            <div className="px-4 pt-3 pb-1 sm:px-6">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {artistFilter && (
+                    <Pill onRemove={() => { setArtistFilter(""); setPage(1); }}>Artist: {artistFilter}</Pill>
+                  )}
+                  {releaseYearFilter !== null && (
+                    <Pill onRemove={() => { setReleaseYearFilter(null); setPage(1); }}>Released {releaseYearFilter}</Pill>
+                  )}
+                  {decadeFilter !== null && (
+                    <Pill onRemove={() => { setDecadeFilter(null); setPage(1); }}>
+                      {DECADES.find((d) => d.lo === decadeFilter)?.label ?? decadeFilter}s
+                    </Pill>
+                  )}
+                  {[...genreFilters].map((g) => (
+                    <Pill key={g} onRemove={() => { setGenreFilters((prev) => { const n = new Set(prev); n.delete(g); return n; }); setPage(1); }}>
+                      {g}
+                    </Pill>
+                  ))}
+                  <p className="text-xs text-neutral-500">
+                    {activeFilterCount > 0 ? (
+                      <>
+                        <span className="text-neutral-300">{filtered.length.toLocaleString()}</span>{" "}
+                        result{filtered.length !== 1 ? "s" : ""}
+                        {totalPages > 1 && <> · page {page} of {totalPages}</>}
+                      </>
+                    ) : (
+                      <>Showing {paginated.length} of {songs.length.toLocaleString()} songs</>
+                    )}
+                  </p>
+                </div>
+                {activeFilterCount > 0 && (
+                  <button
+                    onClick={handleClearAll}
+                    className="text-xs text-neutral-500 hover:text-white transition-colors underline shrink-0"
+                  >
+                    Clear all
+                  </button>
                 )}
-              </p>
+              </div>
             </div>
-            {activeFilters > 0 && (
-              <button
-                onClick={() => {
-                  setQuery("");
-                  setArtistFilter("");
-                  setReleaseYearFilter(null);
-                  setYearFilter(ALL_YEARS);
-                  setGenreFilter(ALL_GENRES);
-                  setPage(1);
-                }}
-                className="text-xs text-neutral-500 hover:text-white transition-colors underline shrink-0"
+          )}
+
+          {/* Random song spotlight */}
+          {randomSong && (
+            <div className="px-4 sm:px-6 pt-2">
+              <div className="rounded-xl border border-amber-700/40 bg-amber-950/20 p-4 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-medium text-amber-500 uppercase tracking-wider mb-1">Random pick</p>
+                  <p className="font-semibold text-white">{randomSong.artist} — {randomSong.title}</p>
+                  <p className="text-sm text-neutral-400 mt-0.5">
+                    {randomSong.air_year}
+                    {randomSong.mb_release && ` · ${randomSong.mb_release}`}
+                    {randomSong.genre && ` · ${randomSong.genre}`}
+                  </p>
+                </div>
+                <button onClick={() => setRandomSong(null)} className="text-neutral-600 hover:text-white text-lg leading-none transition-colors" aria-label="Dismiss">×</button>
+              </div>
+            </div>
+          )}
+
+          {/* Spotify open button */}
+          {!loading && (
+            <div className="px-4 sm:px-6 pt-3">
+              <a
+                href={spotifySearchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-400 hover:bg-neutral-800 hover:text-white transition-colors"
               >
-                Clear filters
-              </button>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-green-400">
+                  <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                </svg>
+                {activeFilterCount > 0
+                  ? `Search this view on Spotify${spotifyWithLinks > 0 ? ` · ${spotifyWithLinks} direct links` : ""}`
+                  : "Open Spotify"}
+              </a>
+            </div>
+          )}
+
+          {/* Song list */}
+          <main className="flex-1 px-2 py-3 sm:px-4">
+            {loading ? (
+              <div className="flex items-center justify-center py-32 text-neutral-600">
+                <div className="text-center">
+                  <div className="inline-block w-6 h-6 border-2 border-neutral-700 border-t-neutral-400 rounded-full animate-spin mb-3" />
+                  <p className="text-sm">Loading archive…</p>
+                </div>
+              </div>
+            ) : paginated.length === 0 ? (
+              <div className="text-center py-32 text-neutral-600">
+                <p className="text-2xl mb-2">♪</p>
+                <p>No songs match your search.</p>
+              </div>
+            ) : (
+              <div className="grid gap-1">
+                {paginated.map((song) => (
+                  <SongCard
+                    key={song.id}
+                    song={song}
+                    artistCount={artistCounts[song.artist] ?? 1}
+                    playCount={songPlayCounts[`${song.artist}|||${song.title}`] ?? 1}
+                    onArtistClick={handleArtistClick}
+                    onGenreClick={handleGenreClick}
+                    onReleaseYearClick={handleReleaseYearClick}
+                    onSpotifyResult={handleSpotifyResult}
+                  />
+                ))}
+              </div>
             )}
-          </div>
-        </div>
-      )}
+          </main>
 
-      {/* Random song spotlight */}
-      {randomSong && (
-        <div className="px-4 sm:px-8 pt-2">
-          <div className="max-w-6xl mx-auto">
-            <div className="rounded-xl border border-amber-700/40 bg-amber-950/20 p-4 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-medium text-amber-500 uppercase tracking-wider mb-1">
-                  Random pick
-                </p>
-                <p className="font-semibold text-white">
-                  {randomSong.artist} — {randomSong.title}
-                </p>
-                <p className="text-sm text-neutral-400 mt-0.5">
-                  {randomSong.air_year}
-                  {randomSong.mb_release && ` · ${randomSong.mb_release}`}
-                  {randomSong.genre && ` · ${randomSong.genre}`}
-                </p>
+          {/* Pagination */}
+          {!loading && totalPages > 1 && (
+            <div className="border-t border-neutral-800 px-4 py-4 sm:px-6">
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 rounded-lg bg-neutral-800 border border-neutral-700 text-sm text-neutral-300 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  ← Prev
+                </button>
+                <span className="text-sm text-neutral-500 px-2">{page} / {totalPages}</span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-3 py-1.5 rounded-lg bg-neutral-800 border border-neutral-700 text-sm text-neutral-300 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next →
+                </button>
               </div>
-              <button
-                onClick={() => setRandomSong(null)}
-                className="text-neutral-600 hover:text-white text-lg leading-none transition-colors"
-                aria-label="Dismiss"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main content */}
-      <main className="flex-1 px-4 py-4 sm:px-8">
-        <div className="max-w-6xl mx-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-32 text-neutral-600">
-              <div className="text-center">
-                <div className="inline-block w-6 h-6 border-2 border-neutral-700 border-t-neutral-400 rounded-full animate-spin mb-3" />
-                <p className="text-sm">Loading archive…</p>
-              </div>
-            </div>
-          ) : paginated.length === 0 ? (
-            <div className="text-center py-32 text-neutral-600">
-              <p className="text-2xl mb-2">♪</p>
-              <p>No songs match your search.</p>
-            </div>
-          ) : (
-            <div className="grid gap-2">
-              {paginated.map((song) => (
-                <SongCard
-                  key={song.id}
-                  song={song}
-                  artistCount={artistCounts[song.artist] ?? 1}
-                  playCount={songPlayCounts[`${song.artist}|||${song.title}`] ?? 1}
-                  onArtistClick={handleArtistClick}
-                  onGenreClick={handleGenreClick}
-                  onReleaseYearClick={handleReleaseYearClick}
-                />
-              ))}
             </div>
           )}
         </div>
-      </main>
-
-      {/* Pagination */}
-      {!loading && totalPages > 1 && (
-        <div className="border-t border-neutral-800 px-4 py-4 sm:px-8">
-          <div className="max-w-6xl mx-auto flex items-center justify-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="px-3 py-1.5 rounded-lg bg-neutral-800 border border-neutral-700 text-sm text-neutral-300 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              ← Prev
-            </button>
-            <span className="text-sm text-neutral-500 px-2">
-              {page} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="px-3 py-1.5 rounded-lg bg-neutral-800 border border-neutral-700 text-sm text-neutral-300 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              Next →
-            </button>
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* Footer */}
       <footer className="border-t border-neutral-800 px-4 py-4 sm:px-8 text-center text-xs text-neutral-700">
-        <a
-          href="https://www.rnz.co.nz"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-neutral-500 transition-colors"
-        >
+        <a href="https://www.rnz.co.nz" target="_blank" rel="noopener noreferrer" className="hover:text-neutral-500 transition-colors">
           Data sourced from RNZ archives
         </a>{" "}
         &middot; radomski.co.nz
