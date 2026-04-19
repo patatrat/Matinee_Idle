@@ -21,8 +21,10 @@ export interface Song {
 }
 
 type SortBy = "date-played" | "times-played" | "date-released";
+type View = "songs" | "artists" | "covers";
 
 const PAGE_SIZE = 50;
+const MIN_COVER_VERSIONS = 4;
 
 const DECADES: { label: string; lo: number; hi: number }[] = [
   { label: "Pre-50s", lo: 0,    hi: 1949 },
@@ -64,7 +66,8 @@ export default function Explorer() {
   const [page, setPage] = useState(1);
 
   // UI state
-  const [view, setView] = useState<"songs" | "artists">("songs");
+  const [view, setView] = useState<View>("songs");
+  const [expandedCovers, setExpandedCovers] = useState<Set<string>>(new Set());
   const [randomSong, setRandomSong] = useState<Song | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -179,6 +182,35 @@ export default function Explorer() {
 
     return result;
   }, [songs, query, artistFilter, releaseYearFilter, decadeFilter, yearFilter, genreFilters, sortBy, songPlayCounts]);
+
+  // Cover versions: same title, 4+ distinct artists across the full archive
+  const coversView = useMemo(() => {
+    const groups: Record<string, { title: string; artistKeys: Set<string>; songs: Song[] }> = {};
+    for (const s of songs) {
+      const key = normalize(s.title);
+      if (!groups[key]) groups[key] = { title: s.title, artistKeys: new Set(), songs: [] };
+      groups[key].artistKeys.add(normalize(s.artist));
+      groups[key].songs.push(s);
+    }
+    return Object.values(groups)
+      .filter(g => g.artistKeys.size >= MIN_COVER_VERSIONS)
+      .map(g => {
+        // One entry per distinct artist — keep their earliest play
+        const byArtist: Record<string, Song> = {};
+        for (const s of g.songs) {
+          const ak = normalize(s.artist);
+          const existing = byArtist[ak];
+          if (!existing || (s.air_year ?? 9999) < (existing.air_year ?? 9999)) {
+            byArtist[ak] = s;
+          }
+        }
+        const versions = Object.values(byArtist).sort(
+          (a, b) => (a.release_year ?? a.air_year ?? 9999) - (b.release_year ?? b.air_year ?? 9999)
+        );
+        return { title: g.title, count: g.artistKeys.size, versions };
+      })
+      .sort((a, b) => b.count - a.count);
+  }, [songs]);
 
   // All artists by unique song count, derived from the already-deduplicated filtered list
   const artistsView = useMemo(() => {
@@ -394,19 +426,21 @@ export default function Explorer() {
           {/* View tabs */}
           {!loading && (
             <div className="flex border-b border-neutral-800 px-1">
-              {(["songs", "artists"] as const).map((v) => (
+              {([
+                { id: "songs",   label: `Songs · ${filtered.length.toLocaleString()}` },
+                { id: "artists", label: `Artists · ${artistsView.length.toLocaleString()}` },
+                { id: "covers",  label: `Covers · ${coversView.length.toLocaleString()}` },
+              ] as { id: View; label: string }[]).map(({ id, label }) => (
                 <button
-                  key={v}
-                  onClick={() => { setView(v); setPage(1); }}
-                  className={`px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors capitalize ${
-                    view === v
+                  key={id}
+                  onClick={() => { setView(id); setPage(1); }}
+                  className={`px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    view === id
                       ? "border-amber-500 text-white"
                       : "border-transparent text-neutral-500 hover:text-neutral-300"
                   }`}
                 >
-                  {v === "songs"
-                    ? `Songs · ${filtered.length.toLocaleString()}`
-                    : `Artists · ${artistsView.length.toLocaleString()}`}
+                  {label}
                 </button>
               ))}
             </div>
@@ -484,7 +518,7 @@ export default function Explorer() {
             </div>
           )}
 
-          {/* Main content: Songs or Artists */}
+          {/* Main content: Songs / Artists / Covers */}
           <main className="flex-1 min-w-0">
             {loading ? (
               <div className="flex items-center justify-center py-32 text-neutral-600">
@@ -492,6 +526,64 @@ export default function Explorer() {
                   <div className="inline-block w-6 h-6 border-2 border-neutral-700 border-t-neutral-400 rounded-full animate-spin mb-3" />
                   <p className="text-sm">Loading archive…</p>
                 </div>
+              </div>
+            ) : view === "covers" ? (
+              <div className="divide-y divide-neutral-900/60 px-4 sm:px-6 py-2">
+                {coversView.map(({ title, count, versions }) => {
+                  const isOpen = expandedCovers.has(title);
+                  return (
+                    <div key={title} className="py-3">
+                      {/* Header row — click to expand/collapse */}
+                      <button
+                        onClick={() => setExpandedCovers(prev => {
+                          const next = new Set(prev);
+                          if (next.has(title)) next.delete(title); else next.add(title);
+                          return next;
+                        })}
+                        className="w-full flex items-center gap-3 text-left group"
+                      >
+                        <span className={`text-neutral-600 transition-transform duration-200 shrink-0 ${isOpen ? "rotate-90" : ""}`}>
+                          ▶
+                        </span>
+                        <span className="flex-1 font-semibold text-neutral-100 group-hover:text-white transition-colors">
+                          {title}
+                        </span>
+                        <span className="shrink-0 text-xs font-medium bg-neutral-800 text-neutral-400 rounded-full px-2.5 py-0.5">
+                          {count} versions
+                        </span>
+                      </button>
+
+                      {/* Expandable version list */}
+                      {isOpen && (
+                        <div className="mt-3 ml-6 flex flex-col gap-1">
+                          {versions.map((s) => (
+                            <div key={s.id} className="flex items-center gap-2 py-1.5 border-l-2 border-neutral-800 pl-3">
+                              <div className="flex-1 min-w-0">
+                                <button
+                                  onClick={() => { setView("songs"); handleArtistClick(s.artist); }}
+                                  className="text-sm text-neutral-300 hover:text-white hover:underline text-left transition-colors"
+                                >
+                                  {s.artist}
+                                </button>
+                                {(s.release_year || s.air_year) && (
+                                  <span className="ml-2 text-xs text-neutral-600">
+                                    {s.release_year ? `${s.release_year}` : `played ${s.air_year}`}
+                                  </span>
+                                )}
+                                {s.genre && (
+                                  <span className="ml-2 text-xs text-neutral-700">{s.genre}</span>
+                                )}
+                              </div>
+                              <span className="text-xs text-neutral-700 shrink-0">
+                                {s.air_year}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : view === "artists" ? (
               artistsView.length === 0 ? (
