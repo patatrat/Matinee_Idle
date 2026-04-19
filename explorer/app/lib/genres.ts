@@ -35,3 +35,33 @@ export const GENRE_CONFIG: Record<string, GenreConfig> = {
 export const FALLBACK_BAR = "bg-neutral-800";
 
 export const SORTED_GENRES = Object.keys(GENRE_CONFIG).sort();
+
+export const GENRE_HEX: Record<string, string> = {
+  "rock":             "#ef4444",
+  "classic rock":     "#f97316",
+  "soul":             "#f59e0b",
+  "pop":              "#ec4899",
+  "country":          "#ca8a04",
+  "new wave":         "#06b6d4",
+  "folk":             "#65a30d",
+  "jazz":             "#8b5cf6",
+  "blues":            "#2563eb",
+  "indie":            "#10b981",
+  "comedy":           "#facc15",
+  "rockabilly":       "#ea580c",
+  "progressive rock": "#a855f7",
+  "funk":             "#d946ef",
+  "punk":             "#e11d48",
+  "electronic":       "#38bdf8",
+  "alternative":      "#14b8a6",
+  "reggae":           "#16a34a",
+  "bluegrass":        "#4d7c0f",
+  "disco":            "#e879f9",
+  "metal":            "#991b1b",
+  "hip-hop":          "#fbbf24",
+  "world":            "#0891b2",
+  "classical":        "#a8a29e",
+  "soundtrack":       "#6366f1",
+};
+
+export const FALLBACK_HEX = "#404040";

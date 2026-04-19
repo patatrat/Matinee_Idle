@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import SongCard from "./SongCard";
 import FilterSidebar from "./FilterSidebar";
+import StatsView from "./StatsView";
 
 export interface Song {
   id: string;
@@ -21,8 +22,10 @@ export interface Song {
 }
 
 type SortBy = "date-played" | "times-played" | "date-released";
+type View = "songs" | "artists" | "covers" | "stats";
 
 const PAGE_SIZE = 50;
+const MIN_COVER_VERSIONS = 4;
 
 const DECADES: { label: string; lo: number; hi: number }[] = [
   { label: "Pre-50s", lo: 0,    hi: 1949 },
@@ -60,10 +63,12 @@ export default function Explorer() {
   const [decadeFilter, setDecadeFilter] = useState<number | null>(null);
   const [releaseYearFilter, setReleaseYearFilter] = useState<number | null>(null);
   const [genreFilters, setGenreFilters] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy] = useState<SortBy>("date-played");
+  const [sortBy, setSortBy] = useState<SortBy>("times-played");
   const [page, setPage] = useState(1);
 
   // UI state
+  const [view, setView] = useState<View>("songs");
+  const [expandedCovers, setExpandedCovers] = useState<Set<string>>(new Set());
   const [randomSong, setRandomSong] = useState<Song | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -81,10 +86,27 @@ export default function Explorer() {
     return Array.from(s).sort((a, b) => a - b);
   }, [songs]);
 
+  // Group artist play counts by normalized key so punctuation/spelling variants
+  // ("Dr. Hook", "Dr Hook", "Dr. Hook & The Medicine Show") share the same count.
   const artistCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const s of songs) counts[s.artist] = (counts[s.artist] ?? 0) + 1;
+    for (const s of songs) {
+      const key = normalize(s.artist);
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
     return counts;
+  }, [songs]);
+
+  // For each normalized artist key, track the shortest raw name as the canonical
+  // display/filter value — so clicking any variant sets the filter to the base form
+  // that substring-matches all longer variants (e.g. "Dr Hook" matches "Dr. Hook & …").
+  const canonicalArtist = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const s of songs) {
+      const key = normalize(s.artist);
+      if (!map[key] || s.artist.length < map[key].length) map[key] = s.artist;
+    }
+    return map;
   }, [songs]);
 
   const songPlayCounts = useMemo(() => {
@@ -97,6 +119,13 @@ export default function Explorer() {
   }, [songs]);
 
   const uniqueArtists = useMemo(() => Object.keys(artistCounts).length, [artistCounts]);
+
+  const topArtists = useMemo(() => {
+    return Object.entries(artistCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15)
+      .map(([key, count]) => ({ artist: canonicalArtist[key] ?? key, count }));
+  }, [artistCounts, canonicalArtist]);
 
   const filtered = useMemo(() => {
     let result = songs;
@@ -143,8 +172,58 @@ export default function Explorer() {
       result = [...result].sort((a, b) => (a.release_year ?? 9999) - (b.release_year ?? 9999));
     }
 
+    // Deduplicate: show each unique song once — play count badge shows total plays
+    const seen = new Set<string>();
+    result = result.filter((s) => {
+      const key = `${s.artist}|||${s.title}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
     return result;
   }, [songs, query, artistFilter, releaseYearFilter, decadeFilter, yearFilter, genreFilters, sortBy, songPlayCounts]);
+
+  // Cover versions: same title, 4+ distinct artists across the full archive
+  const coversView = useMemo(() => {
+    const groups: Record<string, { title: string; artistKeys: Set<string>; songs: Song[] }> = {};
+    for (const s of songs) {
+      const key = normalize(s.title);
+      if (!groups[key]) groups[key] = { title: s.title, artistKeys: new Set(), songs: [] };
+      groups[key].artistKeys.add(normalize(s.artist));
+      groups[key].songs.push(s);
+    }
+    return Object.values(groups)
+      .filter(g => g.artistKeys.size >= MIN_COVER_VERSIONS)
+      .map(g => {
+        // One entry per distinct artist — keep their earliest play
+        const byArtist: Record<string, Song> = {};
+        for (const s of g.songs) {
+          const ak = normalize(s.artist);
+          const existing = byArtist[ak];
+          if (!existing || (s.air_year ?? 9999) < (existing.air_year ?? 9999)) {
+            byArtist[ak] = s;
+          }
+        }
+        const versions = Object.values(byArtist).sort(
+          (a, b) => (a.release_year ?? a.air_year ?? 9999) - (b.release_year ?? b.air_year ?? 9999)
+        );
+        return { title: g.title, count: g.artistKeys.size, versions };
+      })
+      .sort((a, b) => b.count - a.count);
+  }, [songs]);
+
+  // All artists by unique song count, derived from the already-deduplicated filtered list
+  const artistsView = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of filtered) {
+      const key = normalize(s.artist);
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, count]) => ({ artist: canonicalArtist[key] ?? key, count }));
+  }, [filtered, canonicalArtist]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -168,10 +247,17 @@ export default function Explorer() {
   }, []);
 
   const handleArtistClick = useCallback((artist: string) => {
-    setArtistFilter(artist);
+    setArtistFilter(canonicalArtist[normalize(artist)] ?? artist);
     setQuery("");
     setPage(1);
-  }, []);
+  }, [canonicalArtist]);
+
+  const handleTopArtistClick = useCallback((artist: string) => {
+    setView("songs");
+    setArtistFilter(canonicalArtist[normalize(artist)] ?? artist);
+    setQuery("");
+    setPage(1);
+  }, [canonicalArtist]);
 
   const handleGenreClick = useCallback((genre: string) => {
     setGenreFilters((prev) => {
@@ -247,6 +333,8 @@ export default function Explorer() {
     onRandom: pickRandom,
     onClearAll: handleClearAll,
     activeFilterCount,
+    topArtists,
+    onTopArtistClick: handleTopArtistClick,
   };
 
   return (
@@ -336,8 +424,32 @@ export default function Explorer() {
             </div>
           </div>
 
-          {/* Results summary + active pills */}
+          {/* View tabs */}
           {!loading && (
+            <div className="flex border-b border-neutral-800 px-1">
+              {([
+                { id: "songs",   label: `Songs · ${filtered.length.toLocaleString()}` },
+                { id: "artists", label: `Artists · ${artistsView.length.toLocaleString()}` },
+                { id: "covers",  label: `Covers · ${coversView.length.toLocaleString()}` },
+                { id: "stats",   label: "Stats" },
+              ] as { id: View; label: string }[]).map(({ id, label }) => (
+                <button
+                  key={id}
+                  onClick={() => { setView(id); setPage(1); }}
+                  className={`px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    view === id
+                      ? "border-amber-500 text-white"
+                      : "border-transparent text-neutral-500 hover:text-neutral-300"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Active filter pills + result summary */}
+          {!loading && view === "songs" && (
             <div className="px-4 pt-3 pb-1 sm:px-6">
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -357,17 +469,9 @@ export default function Explorer() {
                       {g}
                     </Pill>
                   ))}
-                  <p className="text-xs text-neutral-500">
-                    {activeFilterCount > 0 ? (
-                      <>
-                        <span className="text-neutral-300">{filtered.length.toLocaleString()}</span>{" "}
-                        result{filtered.length !== 1 ? "s" : ""}
-                        {totalPages > 1 && <> · page {page} of {totalPages}</>}
-                      </>
-                    ) : (
-                      <>Showing {paginated.length} of {songs.length.toLocaleString()} songs</>
-                    )}
-                  </p>
+                  {totalPages > 1 && (
+                    <p className="text-xs text-neutral-600">page {page} of {totalPages}</p>
+                  )}
                 </div>
                 {activeFilterCount > 0 && (
                   <button
@@ -399,8 +503,8 @@ export default function Explorer() {
             </div>
           )}
 
-          {/* Spotify open button */}
-          {!loading && (
+          {/* Spotify open button — only shown in songs view with meaningful filters */}
+          {!loading && view === "songs" && (artistFilter || genreFilters.size > 0 || query.trim()) && (
             <div className="px-4 sm:px-6 pt-3">
               <a
                 href={spotifySearchUrl}
@@ -411,15 +515,13 @@ export default function Explorer() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-green-400">
                   <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
                 </svg>
-                {activeFilterCount > 0
-                  ? `Search this view on Spotify${spotifyWithLinks > 0 ? ` · ${spotifyWithLinks} direct links` : ""}`
-                  : "Open Spotify"}
+                {`Search on Spotify${spotifyWithLinks > 0 ? ` · ${spotifyWithLinks} direct links` : ""}`}
               </a>
             </div>
           )}
 
-          {/* Song list */}
-          <main className="flex-1 px-2 py-3 sm:px-4">
+          {/* Main content: Songs / Artists / Covers */}
+          <main className="flex-1 min-w-0">
             {loading ? (
               <div className="flex items-center justify-center py-32 text-neutral-600">
                 <div className="text-center">
@@ -427,18 +529,105 @@ export default function Explorer() {
                   <p className="text-sm">Loading archive…</p>
                 </div>
               </div>
+            ) : view === "stats" ? (
+              <StatsView songs={songs} />
+            ) : view === "covers" ? (
+              <div className="divide-y divide-neutral-900/60 px-4 sm:px-6 py-2">
+                {coversView.map(({ title, count, versions }) => {
+                  const isOpen = expandedCovers.has(title);
+                  return (
+                    <div key={title} className="py-3">
+                      {/* Header row — click to expand/collapse */}
+                      <button
+                        onClick={() => setExpandedCovers(prev => {
+                          const next = new Set(prev);
+                          if (next.has(title)) next.delete(title); else next.add(title);
+                          return next;
+                        })}
+                        className="w-full flex items-center gap-3 text-left group"
+                      >
+                        <span className={`text-neutral-600 transition-transform duration-200 shrink-0 ${isOpen ? "rotate-90" : ""}`}>
+                          ▶
+                        </span>
+                        <span className="flex-1 font-semibold text-neutral-100 group-hover:text-white transition-colors">
+                          {title}
+                        </span>
+                        <span className="shrink-0 text-xs font-medium bg-neutral-800 text-neutral-400 rounded-full px-2.5 py-0.5">
+                          {count} versions
+                        </span>
+                      </button>
+
+                      {/* Expandable version list */}
+                      {isOpen && (
+                        <div className="mt-3 ml-6 flex flex-col gap-1">
+                          {versions.map((s) => (
+                            <div key={s.id} className="flex items-center gap-2 py-1.5 border-l-2 border-neutral-800 pl-3">
+                              <div className="flex-1 min-w-0">
+                                <button
+                                  onClick={() => { setView("songs"); handleArtistClick(s.artist); }}
+                                  className="text-sm text-neutral-300 hover:text-white hover:underline text-left transition-colors"
+                                >
+                                  {s.artist}
+                                </button>
+                                {(s.release_year || s.air_year) && (
+                                  <span className="ml-2 text-xs text-neutral-600">
+                                    {s.release_year ? `${s.release_year}` : `played ${s.air_year}`}
+                                  </span>
+                                )}
+                                {s.genre && (
+                                  <span className="ml-2 text-xs text-neutral-700">{s.genre}</span>
+                                )}
+                              </div>
+                              <span className="text-xs text-neutral-700 shrink-0">
+                                {s.air_year}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : view === "artists" ? (
+              artistsView.length === 0 ? (
+                <div className="text-center py-32 text-neutral-600">
+                  <p className="text-2xl mb-2">♪</p>
+                  <p>No artists match your filters.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-neutral-900/60">
+                  {artistsView.map(({ artist, count }, i) => (
+                    <button
+                      key={artist}
+                      onClick={() => { setView("songs"); handleArtistClick(artist); }}
+                      className="w-full flex items-center gap-3 px-4 sm:px-6 py-3 hover:bg-neutral-900 transition-colors text-left group"
+                    >
+                      <span className="text-xs text-neutral-700 w-8 text-right tabular-nums shrink-0 group-hover:text-neutral-500">
+                        {i + 1}
+                      </span>
+                      <span className="flex-1 text-sm text-neutral-300 group-hover:text-white transition-colors">
+                        {artist}
+                      </span>
+                      <span className="text-xs text-neutral-600 group-hover:text-neutral-400 tabular-nums shrink-0">
+                        {count} {count === 1 ? "song" : "songs"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )
             ) : paginated.length === 0 ? (
               <div className="text-center py-32 text-neutral-600">
                 <p className="text-2xl mb-2">♪</p>
                 <p>No songs match your search.</p>
               </div>
             ) : (
-              <div className="grid gap-1">
+              <div className="grid gap-1 px-2 py-3 sm:px-4">
                 {paginated.map((song) => (
                   <SongCard
                     key={song.id}
                     song={song}
-                    artistCount={artistCounts[song.artist] ?? 1}
+                    artistCount={artistCounts[normalize(song.artist)] ?? 1}
                     playCount={songPlayCounts[`${song.artist}|||${song.title}`] ?? 1}
                     onArtistClick={handleArtistClick}
                     onGenreClick={handleGenreClick}
@@ -450,8 +639,8 @@ export default function Explorer() {
             )}
           </main>
 
-          {/* Pagination */}
-          {!loading && totalPages > 1 && (
+          {/* Pagination — songs view only */}
+          {!loading && view === "songs" && totalPages > 1 && (
             <div className="border-t border-neutral-800 px-4 py-4 sm:px-6">
               <div className="flex items-center justify-center gap-2">
                 <button
