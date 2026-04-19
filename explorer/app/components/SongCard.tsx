@@ -178,8 +178,6 @@ export default function SongCard({
               </button>
             </>
           )}
-          <span>·</span>
-          <span>{formatAirDate(song)}</span>
           {song.genre && genrePill && (
             <>
               <span>·</span>
