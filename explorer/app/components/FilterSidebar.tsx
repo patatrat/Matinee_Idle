@@ -95,25 +95,6 @@ export default function FilterSidebar({
         )}
       </div>
 
-      {/* Top Artists */}
-      <SectionLabel>Top artists</SectionLabel>
-      <div className="flex flex-col gap-0.5">
-        {topArtists.map(({ artist, count }) => (
-          <button
-            key={artist}
-            onClick={() => onTopArtistClick(artist)}
-            className={`flex items-center justify-between rounded px-2 py-1 text-xs text-left transition-colors group ${
-              artistFilter === artist
-                ? "bg-neutral-800 text-white"
-                : "text-neutral-500 hover:text-neutral-300 hover:bg-neutral-900"
-            }`}
-          >
-            <span className="truncate">{artist}</span>
-            <span className="ml-2 shrink-0 text-neutral-700 group-hover:text-neutral-500">{count}</span>
-          </button>
-        ))}
-      </div>
-
       {/* Sort */}
       <SectionLabel>Sort by</SectionLabel>
       <div className="flex flex-col gap-1">
@@ -202,6 +183,25 @@ export default function FilterSidebar({
             </button>
           );
         })}
+      </div>
+
+      {/* Top Artists */}
+      <SectionLabel>Top artists</SectionLabel>
+      <div className="flex flex-col gap-0.5">
+        {topArtists.map(({ artist, count }) => (
+          <button
+            key={artist}
+            onClick={() => onTopArtistClick(artist)}
+            className={`flex items-center justify-between rounded px-2 py-1 text-xs text-left transition-colors group ${
+              artistFilter === artist
+                ? "bg-neutral-800 text-white"
+                : "text-neutral-500 hover:text-neutral-300 hover:bg-neutral-900"
+            }`}
+          >
+            <span className="truncate">{artist}</span>
+            <span className="ml-2 shrink-0 text-neutral-700 group-hover:text-neutral-500">{count}</span>
+          </button>
+        ))}
       </div>
 
       {/* Actions */}

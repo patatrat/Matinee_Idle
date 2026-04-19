@@ -60,10 +60,11 @@ export default function Explorer() {
   const [decadeFilter, setDecadeFilter] = useState<number | null>(null);
   const [releaseYearFilter, setReleaseYearFilter] = useState<number | null>(null);
   const [genreFilters, setGenreFilters] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy] = useState<SortBy>("date-played");
+  const [sortBy, setSortBy] = useState<SortBy>("times-played");
   const [page, setPage] = useState(1);
 
   // UI state
+  const [view, setView] = useState<"songs" | "artists">("songs");
   const [randomSong, setRandomSong] = useState<Song | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -179,6 +180,18 @@ export default function Explorer() {
     return result;
   }, [songs, query, artistFilter, releaseYearFilter, decadeFilter, yearFilter, genreFilters, sortBy, songPlayCounts]);
 
+  // All artists by unique song count, derived from the already-deduplicated filtered list
+  const artistsView = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of filtered) {
+      const key = normalize(s.artist);
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, count]) => ({ artist: canonicalArtist[key] ?? key, count }));
+  }, [filtered, canonicalArtist]);
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -201,6 +214,13 @@ export default function Explorer() {
   }, []);
 
   const handleArtistClick = useCallback((artist: string) => {
+    setArtistFilter(canonicalArtist[normalize(artist)] ?? artist);
+    setQuery("");
+    setPage(1);
+  }, [canonicalArtist]);
+
+  const handleTopArtistClick = useCallback((artist: string) => {
+    setView("songs");
     setArtistFilter(canonicalArtist[normalize(artist)] ?? artist);
     setQuery("");
     setPage(1);
@@ -281,7 +301,7 @@ export default function Explorer() {
     onClearAll: handleClearAll,
     activeFilterCount,
     topArtists,
-    onTopArtistClick: handleArtistClick,
+    onTopArtistClick: handleTopArtistClick,
   };
 
   return (
@@ -371,8 +391,29 @@ export default function Explorer() {
             </div>
           </div>
 
-          {/* Results summary + active pills */}
+          {/* View tabs */}
           {!loading && (
+            <div className="flex border-b border-neutral-800 px-1">
+              {(["songs", "artists"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => { setView(v); setPage(1); }}
+                  className={`px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors capitalize ${
+                    view === v
+                      ? "border-amber-500 text-white"
+                      : "border-transparent text-neutral-500 hover:text-neutral-300"
+                  }`}
+                >
+                  {v === "songs"
+                    ? `Songs · ${filtered.length.toLocaleString()}`
+                    : `Artists · ${artistsView.length.toLocaleString()}`}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Active filter pills + result summary */}
+          {!loading && view === "songs" && (
             <div className="px-4 pt-3 pb-1 sm:px-6">
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -392,17 +433,9 @@ export default function Explorer() {
                       {g}
                     </Pill>
                   ))}
-                  <p className="text-xs text-neutral-500">
-                    {activeFilterCount > 0 ? (
-                      <>
-                        <span className="text-neutral-300">{filtered.length.toLocaleString()}</span>{" "}
-                        result{filtered.length !== 1 ? "s" : ""}
-                        {totalPages > 1 && <> · page {page} of {totalPages}</>}
-                      </>
-                    ) : (
-                      <>Showing {paginated.length} of {songs.length.toLocaleString()} songs</>
-                    )}
-                  </p>
+                  {totalPages > 1 && (
+                    <p className="text-xs text-neutral-600">page {page} of {totalPages}</p>
+                  )}
                 </div>
                 {activeFilterCount > 0 && (
                   <button
@@ -434,8 +467,8 @@ export default function Explorer() {
             </div>
           )}
 
-          {/* Spotify open button — only shown when there's a meaningful search query */}
-          {!loading && (artistFilter || genreFilters.size > 0 || query.trim()) && (
+          {/* Spotify open button — only shown in songs view with meaningful filters */}
+          {!loading && view === "songs" && (artistFilter || genreFilters.size > 0 || query.trim()) && (
             <div className="px-4 sm:px-6 pt-3">
               <a
                 href={spotifySearchUrl}
@@ -451,8 +484,8 @@ export default function Explorer() {
             </div>
           )}
 
-          {/* Song list */}
-          <main className="flex-1 px-2 py-3 sm:px-4">
+          {/* Main content: Songs or Artists */}
+          <main className="flex-1 min-w-0">
             {loading ? (
               <div className="flex items-center justify-center py-32 text-neutral-600">
                 <div className="text-center">
@@ -460,13 +493,40 @@ export default function Explorer() {
                   <p className="text-sm">Loading archive…</p>
                 </div>
               </div>
+            ) : view === "artists" ? (
+              artistsView.length === 0 ? (
+                <div className="text-center py-32 text-neutral-600">
+                  <p className="text-2xl mb-2">♪</p>
+                  <p>No artists match your filters.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-neutral-900/60">
+                  {artistsView.map(({ artist, count }, i) => (
+                    <button
+                      key={artist}
+                      onClick={() => { setView("songs"); handleArtistClick(artist); }}
+                      className="w-full flex items-center gap-3 px-4 sm:px-6 py-3 hover:bg-neutral-900 transition-colors text-left group"
+                    >
+                      <span className="text-xs text-neutral-700 w-8 text-right tabular-nums shrink-0 group-hover:text-neutral-500">
+                        {i + 1}
+                      </span>
+                      <span className="flex-1 text-sm text-neutral-300 group-hover:text-white transition-colors">
+                        {artist}
+                      </span>
+                      <span className="text-xs text-neutral-600 group-hover:text-neutral-400 tabular-nums shrink-0">
+                        {count} {count === 1 ? "song" : "songs"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )
             ) : paginated.length === 0 ? (
               <div className="text-center py-32 text-neutral-600">
                 <p className="text-2xl mb-2">♪</p>
                 <p>No songs match your search.</p>
               </div>
             ) : (
-              <div className="grid gap-1">
+              <div className="grid gap-1 px-2 py-3 sm:px-4">
                 {paginated.map((song) => (
                   <SongCard
                     key={song.id}
@@ -483,8 +543,8 @@ export default function Explorer() {
             )}
           </main>
 
-          {/* Pagination */}
-          {!loading && totalPages > 1 && (
+          {/* Pagination — songs view only */}
+          {!loading && view === "songs" && totalPages > 1 && (
             <div className="border-t border-neutral-800 px-4 py-4 sm:px-6">
               <div className="flex items-center justify-center gap-2">
                 <button
