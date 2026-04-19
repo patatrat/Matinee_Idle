@@ -530,7 +530,13 @@ export default function Explorer() {
                 </div>
               </div>
             ) : view === "stats" ? (
-              <StatsView songs={songs} />
+              <StatsView
+                songs={songs}
+                onGenreClick={(genre) => { setGenreFilters(new Set([genre])); setView("songs"); setPage(1); }}
+                onArtistClick={handleTopArtistClick}
+                onYearClick={(year) => { setYearFilter(year); setView("songs"); setPage(1); }}
+                onDecadeClick={(lo) => { handleDecadeChange(lo); setView("songs"); }}
+              />
             ) : view === "covers" ? (
               <div className="divide-y divide-neutral-900/60 px-4 sm:px-6 py-2">
                 {coversView.map(({ title, count, versions }) => {

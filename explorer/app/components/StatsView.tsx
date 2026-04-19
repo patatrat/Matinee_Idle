@@ -7,6 +7,14 @@ import {
 import { GENRE_HEX, FALLBACK_HEX } from "../lib/genres";
 import type { Song } from "./Explorer";
 
+interface StatsViewProps {
+  songs: Song[];
+  onGenreClick: (genre: string) => void;
+  onArtistClick: (artist: string) => void;
+  onYearClick: (year: string) => void;
+  onDecadeClick: (lo: number) => void;
+}
+
 function normalize(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -49,6 +57,8 @@ const TOOLTIP_PROPS = {
     fontSize: 12,
     color: "#d4d4d4",
   },
+  itemStyle: { color: "#d4d4d4" },
+  labelStyle: { color: "#a3a3a3" },
   cursor: { fill: "rgba(255,255,255,0.04)" },
 };
 
@@ -67,7 +77,7 @@ function ChartSection({ title, children, span2 = false }: {
   );
 }
 
-export default function StatsView({ songs }: { songs: Song[] }) {
+export default function StatsView({ songs, onGenreClick, onArtistClick, onYearClick, onDecadeClick }: StatsViewProps) {
   const spotifyCount = useMemo(
     () => songs.filter(s => s.spotify_url).length,
     [songs]
@@ -101,6 +111,7 @@ export default function StatsView({ songs }: { songs: Song[] }) {
   const releaseDecades = useMemo(() => {
     return DECADE_BINS.map(d => ({
       label: d.label,
+      lo: d.lo,
       count: songs.filter(
         s => s.release_year != null && s.release_year >= d.lo && s.release_year <= d.hi
       ).length,
@@ -119,6 +130,7 @@ export default function StatsView({ songs }: { songs: Song[] }) {
       .slice(0, 20)
       .map(({ artist, title, count }) => ({
         label: trunc(`${artist} — ${title}`, 40),
+        rawArtist: artist,
         count,
       }));
   }, [songs]);
@@ -175,7 +187,8 @@ export default function StatsView({ songs }: { songs: Song[] }) {
               <XAxis dataKey="year" tick={TICK} {...AXIS_PROPS} interval={1} />
               <YAxis tick={TICK} {...AXIS_PROPS} width={40} />
               <Tooltip {...TOOLTIP_PROPS} />
-              <Bar dataKey="count" name="plays" fill="#f59e0b" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="count" name="plays" fill="#f59e0b" radius={[2, 2, 0, 0]}
+                cursor="pointer" onClick={(d) => onYearClick((d as unknown as { year: string }).year)} />
             </BarChart>
           </ResponsiveContainer>
         </ChartSection>
@@ -187,7 +200,8 @@ export default function StatsView({ songs }: { songs: Song[] }) {
               <XAxis dataKey="label" tick={TICK} {...AXIS_PROPS} />
               <YAxis tick={TICK} {...AXIS_PROPS} width={40} />
               <Tooltip {...TOOLTIP_PROPS} />
-              <Bar dataKey="count" name="songs" fill="#a3a3a3" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="count" name="songs" fill="#a3a3a3" radius={[2, 2, 0, 0]}
+                cursor="pointer" onClick={(d) => onDecadeClick((d as unknown as { lo: number }).lo)} />
             </BarChart>
           </ResponsiveContainer>
         </ChartSection>
@@ -217,7 +231,8 @@ export default function StatsView({ songs }: { songs: Song[] }) {
                 width={100}
               />
               <Tooltip {...TOOLTIP_PROPS} />
-              <Bar dataKey="count" name="songs" radius={[0, 2, 2, 0]}>
+              <Bar dataKey="count" name="songs" radius={[0, 2, 2, 0]}
+                cursor="pointer" onClick={(d) => onGenreClick((d as unknown as { genre: string }).genre)}>
                 {genreBreakdown.map(({ genre }) => (
                   <Cell key={genre} fill={GENRE_HEX[genre] ?? FALLBACK_HEX} />
                 ))}
@@ -239,7 +254,8 @@ export default function StatsView({ songs }: { songs: Song[] }) {
                 width={120}
               />
               <Tooltip {...TOOLTIP_PROPS} />
-              <Bar dataKey="count" name="plays" fill="#f59e0b" radius={[0, 2, 2, 0]} />
+              <Bar dataKey="count" name="plays" fill="#f59e0b" radius={[0, 2, 2, 0]}
+                cursor="pointer" onClick={(d) => onArtistClick((d as unknown as { label: string }).label)} />
             </BarChart>
           </ResponsiveContainer>
         </ChartSection>
@@ -257,7 +273,8 @@ export default function StatsView({ songs }: { songs: Song[] }) {
                 width={160}
               />
               <Tooltip {...TOOLTIP_PROPS} />
-              <Bar dataKey="count" name="plays" fill="#f59e0b" radius={[0, 2, 2, 0]} />
+              <Bar dataKey="count" name="plays" fill="#f59e0b" radius={[0, 2, 2, 0]}
+                cursor="pointer" onClick={(d) => onArtistClick((d as unknown as { rawArtist: string }).rawArtist)} />
             </BarChart>
           </ResponsiveContainer>
         </ChartSection>
