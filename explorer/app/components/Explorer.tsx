@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import SongCard from "./SongCard";
 import FilterSidebar from "./FilterSidebar";
+import StatsView from "./StatsView";
 
 export interface Song {
   id: string;
@@ -21,7 +22,7 @@ export interface Song {
 }
 
 type SortBy = "date-played" | "times-played" | "date-released";
-type View = "songs" | "artists" | "covers";
+type View = "songs" | "artists" | "covers" | "stats";
 
 const PAGE_SIZE = 50;
 const MIN_COVER_VERSIONS = 4;
@@ -430,6 +431,10 @@ export default function Explorer() {
                 { id: "songs",   label: `Songs · ${filtered.length.toLocaleString()}` },
                 { id: "artists", label: `Artists · ${artistsView.length.toLocaleString()}` },
                 { id: "covers",  label: `Covers · ${coversView.length.toLocaleString()}` },
+<<<<<<< HEAD
+=======
+                { id: "stats",   label: "Stats" },
+>>>>>>> claude/review-claude-md-sRHvq
               ] as { id: View; label: string }[]).map(({ id, label }) => (
                 <button
                   key={id}
@@ -527,6 +532,17 @@ export default function Explorer() {
                   <p className="text-sm">Loading archive…</p>
                 </div>
               </div>
+<<<<<<< HEAD
+=======
+            ) : view === "stats" ? (
+              <StatsView
+                songs={songs}
+                onGenreClick={(genre) => { setGenreFilters(new Set([genre])); setView("songs"); setPage(1); }}
+                onArtistClick={handleTopArtistClick}
+                onYearClick={(year) => { setYearFilter(year); setView("songs"); setPage(1); }}
+                onDecadeClick={(lo) => { handleDecadeChange(lo); setView("songs"); }}
+              />
+>>>>>>> claude/review-claude-md-sRHvq
             ) : view === "covers" ? (
               <div className="divide-y divide-neutral-900/60 px-4 sm:px-6 py-2">
                 {coversView.map(({ title, count, versions }) => {
