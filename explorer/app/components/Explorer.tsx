@@ -81,10 +81,27 @@ export default function Explorer() {
     return Array.from(s).sort((a, b) => a - b);
   }, [songs]);
 
+  // Group artist play counts by normalized key so punctuation/spelling variants
+  // ("Dr. Hook", "Dr Hook", "Dr. Hook & The Medicine Show") share the same count.
   const artistCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const s of songs) counts[s.artist] = (counts[s.artist] ?? 0) + 1;
+    for (const s of songs) {
+      const key = normalize(s.artist);
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
     return counts;
+  }, [songs]);
+
+  // For each normalized artist key, track the shortest raw name as the canonical
+  // display/filter value — so clicking any variant sets the filter to the base form
+  // that substring-matches all longer variants (e.g. "Dr Hook" matches "Dr. Hook & …").
+  const canonicalArtist = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const s of songs) {
+      const key = normalize(s.artist);
+      if (!map[key] || s.artist.length < map[key].length) map[key] = s.artist;
+    }
+    return map;
   }, [songs]);
 
   const songPlayCounts = useMemo(() => {
@@ -102,8 +119,8 @@ export default function Explorer() {
     return Object.entries(artistCounts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 15)
-      .map(([artist, count]) => ({ artist, count }));
-  }, [artistCounts]);
+      .map(([key, count]) => ({ artist: canonicalArtist[key] ?? key, count }));
+  }, [artistCounts, canonicalArtist]);
 
   const filtered = useMemo(() => {
     let result = songs;
@@ -184,10 +201,10 @@ export default function Explorer() {
   }, []);
 
   const handleArtistClick = useCallback((artist: string) => {
-    setArtistFilter(artist);
+    setArtistFilter(canonicalArtist[normalize(artist)] ?? artist);
     setQuery("");
     setPage(1);
-  }, []);
+  }, [canonicalArtist]);
 
   const handleGenreClick = useCallback((genre: string) => {
     setGenreFilters((prev) => {
@@ -454,7 +471,7 @@ export default function Explorer() {
                   <SongCard
                     key={song.id}
                     song={song}
-                    artistCount={artistCounts[song.artist] ?? 1}
+                    artistCount={artistCounts[normalize(song.artist)] ?? 1}
                     playCount={songPlayCounts[`${song.artist}|||${song.title}`] ?? 1}
                     onArtistClick={handleArtistClick}
                     onGenreClick={handleGenreClick}
