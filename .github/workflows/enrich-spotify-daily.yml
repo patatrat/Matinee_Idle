@@ -31,13 +31,13 @@ jobs:
           git config user.name "Spotify Enrichment Bot"
 
           # Check if there are any changes to commit
-          if git diff --quiet spotify_cache.json songs_enriched.json 2>/dev/null; then
+          if git diff --quiet spotify_cache.json explorer/public/songs.json 2>/dev/null; then
             echo "No changes to commit"
             exit 0
           fi
 
           # Add only the enrichment files (don't commit unrelated changes)
-          git add spotify_cache.json songs_enriched.json 2>/dev/null || true
+          git add spotify_cache.json explorer/public/songs.json 2>/dev/null || true
 
           # Commit if there are staged changes
           if ! git diff --cached --quiet; then

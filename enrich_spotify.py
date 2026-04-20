@@ -23,9 +23,8 @@ import urllib.error
 import base64
 
 HERE        = os.path.dirname(os.path.abspath(__file__))
-SONGS_IN    = os.path.join(HERE, "songs_enriched.json")
-SONGS_FALL  = os.path.join(HERE, "songs.json")
-SONGS_OUT   = os.path.join(HERE, "songs_enriched.json")
+SONGS_PATH  = os.path.join(HERE, "explorer/public/songs.json")
+SONGS_BACK  = SONGS_PATH + ".bak"
 CHECKPOINT  = os.path.join(HERE, "spotify_cache.json")
 
 CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID",     "f3bcd797aeaa4a50bcb6132366835d64")
@@ -189,9 +188,8 @@ def cache_key(song: dict) -> str:
 # ── main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    src = SONGS_IN if os.path.exists(SONGS_IN) else SONGS_FALL
-    print(f"Reading from: {os.path.basename(src)}")
-    songs = json.load(open(src))
+    print(f"Reading from: {SONGS_PATH}")
+    songs = json.load(open(SONGS_PATH))
 
     to_enrich = [s for s in songs if not s.get("spotify_url")]
     print(f"Songs without Spotify data: {len(to_enrich)}")
@@ -260,9 +258,9 @@ def main():
     print(f"Spotify data applied:       {applied} songs")
     print(f"Total with Spotify:         {sum(1 for s in songs if s.get('spotify_url'))} / {len(songs)}")
 
-    with open(SONGS_OUT, "w") as f:
+    with open(SONGS_PATH, "w") as f:
         json.dump(songs, f, separators=(",", ":"))
-    print(f"Written to {SONGS_OUT}")
+    print(f"Written to {SONGS_PATH}")
 
 
 if __name__ == "__main__":
