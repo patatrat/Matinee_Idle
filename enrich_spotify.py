@@ -232,11 +232,18 @@ def main():
             if fetched % SAVE_EVERY == 0:
                 save_checkpoint(cache)
             time.sleep(RATE_LIMIT)
+        except RuntimeError as e:
+            # Daily quota exhausted — save immediately and stop; don't cache this
+            # song so the next run retries it from the checkpoint.
+            save_checkpoint(cache)
+            print(f"\nQuota exhausted: {e}")
+            print(f"Checkpoint saved. Rerun tomorrow to resume from here.")
+            break
         except Exception as e:
             errors += 1
             cache[key] = None
             print(f"  ERROR {song['artist']!r} — {song['title']!r}: {e}")
-            time.sleep(RATE_LIMIT * 5)
+            time.sleep(RATE_LIMIT * 4)
 
     save_checkpoint(cache)
     print(f"\nDone. {fetched} searches, {matched} matched, {errors} errors.")
