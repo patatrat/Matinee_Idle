@@ -229,6 +229,7 @@ export default function StatsView({ songs, onGenreClick, onArtistClick, onYearCl
                 tick={{ ...TICK, fontSize: 10 }}
                 {...AXIS_PROPS}
                 width={100}
+                interval={0}
               />
               <Tooltip {...TOOLTIP_PROPS} />
               <Bar dataKey="count" name="songs" radius={[0, 2, 2, 0]}
