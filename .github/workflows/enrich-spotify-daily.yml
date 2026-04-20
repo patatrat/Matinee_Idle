@@ -1,0 +1,48 @@
+name: Daily Spotify Enrichment
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 2am UTC daily (off-peak, no user interference)
+  workflow_dispatch:      # Allow manual trigger from Actions tab
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Run Spotify enrichment
+        env:
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python3 enrich_spotify.py --safe
+        continue-on-error: true  # Don't fail the workflow if quota is hit
+
+      - name: Commit and push updated checkpoint
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "Spotify Enrichment Bot"
+
+          # Check if there are any changes to commit
+          if git diff --quiet spotify_cache.json songs_enriched.json 2>/dev/null; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          # Add only the enrichment files (don't commit unrelated changes)
+          git add spotify_cache.json songs_enriched.json 2>/dev/null || true
+
+          # Commit if there are staged changes
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: daily Spotify enrichment checkpoint update"
+            git push
+          else
+            echo "No changes to push"
+          fi
