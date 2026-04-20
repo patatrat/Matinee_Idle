@@ -46,7 +46,8 @@ ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 DRY_RUN      = "--dry-run"     in sys.argv
 SKIP_LASTFM  = "--skip-lastfm" in sys.argv
 SKIP_CLAUDE  = "--skip-claude" in sys.argv
-RATE_LIMIT   = 0.27   # ~3.7 req/sec, comfortably under Last.fm's 5/sec
+SAFE_MODE    = "--safe"        in sys.argv  # reduce to ~2 req/sec
+RATE_LIMIT   = 0.33 if SAFE_MODE else 0.3  # ~3.3 or ~2 req/sec, under Last.fm's 5/sec
 CLAUDE_BATCH = 50
 
 # ── Genre constants ───────────────────────────────────────────────────────────

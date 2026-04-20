@@ -29,9 +29,12 @@ SONGS_FALL = os.path.join(HERE, "songs.json")          # fallback if enriched do
 SONGS_OUT  = os.path.join(HERE, "songs_enriched.json")
 CHECKPOINT = os.path.join(HERE, "lastfm_genre_cache.json")
 API_KEY    = os.environ.get("LASTFM_API_KEY", "68aae586eac1ab54f7cf77fa6ca9f9a7")
-RATE_LIMIT = 0.25   # seconds between requests (4/sec, under the 5/sec limit)
+RATE_LIMIT = 0.3    # seconds between requests (~3.3/sec, safely under Last.fm's 5/sec)
 SAVE_EVERY = 200
 DRY_RUN    = "--dry-run" in sys.argv
+SAFE_MODE  = "--safe" in sys.argv  # reduce to ~2 req/sec
+if SAFE_MODE:
+    RATE_LIMIT = 0.5
 
 # Tags that aren't useful genre labels
 SKIP_TAGS = {

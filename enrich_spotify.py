@@ -31,10 +31,13 @@ CHECKPOINT  = os.path.join(HERE, "spotify_cache.json")
 CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID",     "f3bcd797aeaa4a50bcb6132366835d64")
 CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "30e26fd9d30844d08b94dced12fe380d")
 
-RATE_LIMIT  = 0.5    # 2 req/sec — conservative for dev mode quota
+RATE_LIMIT  = 0.6    # 1.7 req/sec — conservative to avoid quota issues
 SAVE_EVERY  = 100
 MAX_RETRY_AFTER = 120  # if Spotify asks us to wait longer, abort the run
 DRY_RUN     = "--dry-run" in sys.argv
+SAFE_MODE   = "--safe" in sys.argv  # further reduce rate limit
+if SAFE_MODE:
+    RATE_LIMIT = 1.0  # ~1 req/sec for safety
 
 
 # ── token management ────────────────────────────────────────────────────────
