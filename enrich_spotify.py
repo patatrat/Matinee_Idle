@@ -112,41 +112,37 @@ def best_match(song: dict, candidates: list) -> dict | None:
 # ── Spotify search ───────────────────────────────────────────────────────────
 
 def search_track(artist: str, title: str) -> list:
-    """Try field-qualified search first, fall back to free-text."""
+    """Search Spotify with a single query strategy: qualified field search."""
     token = get_token()
     headers = {"Authorization": f"Bearer {token}"}
 
-    strategies = [
-        f"artist:{artist} track:{title}",
-        f"{artist} {title}",
-    ]
-
-    for query in strategies:
-        params = urllib.parse.urlencode({"q": query, "type": "track", "limit": 5})
-        req = urllib.request.Request(
-            f"https://api.spotify.com/v1/search?{params}",
-            headers=headers,
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read())
-            tracks = data.get("tracks", {}).get("items", [])
-            if tracks:
-                return tracks
-        except urllib.error.HTTPError as e:
-            if e.code == 429:
-                retry_after = int(e.headers.get("Retry-After", 5))
-                if retry_after > MAX_RETRY_AFTER:
-                    raise RuntimeError(
-                        f"Spotify daily quota likely exhausted (Retry-After: {retry_after}s). "
-                        "Wait until tomorrow and rerun — the checkpoint will resume from here."
-                    )
-                print(f"  Rate limited — sleeping {retry_after}s")
-                time.sleep(retry_after)
-                return search_track(artist, title)
-            if e.code in (400, 404):
-                return []
-            raise
+    # Single strategy: qualified field search is most precise and has best match rate.
+    # Limit=10 to give best_match() more candidates to filter through.
+    query = f"artist:{artist} track:{title}"
+    params = urllib.parse.urlencode({"q": query, "type": "track", "limit": 10})
+    req = urllib.request.Request(
+        f"https://api.spotify.com/v1/search?{params}",
+        headers=headers,
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        tracks = data.get("tracks", {}).get("items", [])
+        return tracks
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            retry_after = int(e.headers.get("Retry-After", 5))
+            if retry_after > MAX_RETRY_AFTER:
+                raise RuntimeError(
+                    f"Spotify daily quota likely exhausted (Retry-After: {retry_after}s). "
+                    "Wait until tomorrow and rerun — the checkpoint will resume from here."
+                )
+            print(f"  Rate limited — sleeping {retry_after}s")
+            time.sleep(retry_after)
+            return search_track(artist, title)
+        if e.code in (400, 404):
+            return []
+        raise
 
     return []
 
