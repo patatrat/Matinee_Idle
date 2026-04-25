@@ -2,7 +2,7 @@ name: Daily Spotify Enrichment
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 2am UTC daily (off-peak, no user interference)
+    - cron: '0 6 * * *'  # 6am UTC daily — after Spotify quota resets (~4:55am UTC)
   workflow_dispatch:      # Allow manual trigger from Actions tab
 
 jobs:
