@@ -26,6 +26,8 @@ jobs:
           restore-keys: mb-first-release-cache-
 
       - name: Run release year fix
+        env:
+          PYTHONUNBUFFERED: "1"
         run: python3 fix_release_years.py
 
       - name: Commit results
