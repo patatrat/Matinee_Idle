@@ -17,15 +17,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Restore MB cache (if any)
-        # Allows resuming if the job is re-run after a partial failure
-        uses: actions/cache@v4
-        with:
-          path: mb_first_release_cache.json
-          key: mb-first-release-cache-${{ github.run_id }}
-          restore-keys: mb-first-release-cache-
-
       - name: Run release year fix
+        continue-on-error: true  # commit the cache even if apply phase fails
         env:
           PYTHONUNBUFFERED: "1"
         run: python3 fix_release_years.py
@@ -35,14 +28,11 @@ jobs:
           git config user.email "action@github.com"
           git config user.name "MusicBrainz Release Year Bot"
 
-          if git diff --quiet mb_first_release_cache.json explorer/public/songs.json 2>/dev/null; then
-            echo "No changes"
-            exit 0
-          fi
-
           git add mb_first_release_cache.json explorer/public/songs.json 2>/dev/null || true
 
           if ! git diff --cached --quiet; then
             git commit -m "Fix release years: use MusicBrainz first-release-date"
             git push
+          else
+            echo "No changes to commit"
           fi

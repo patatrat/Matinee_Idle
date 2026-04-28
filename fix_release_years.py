@@ -127,7 +127,11 @@ def main():
         if not first_release:
             no_date += 1
             continue
-        first_year = int(first_release[:4])
+        try:
+            first_year = int(first_release[:4])  # guard against MB's '????' unknown dates
+        except ValueError:
+            no_date += 1
+            continue
         if song.get("release_year") != first_year:
             song["release_year"] = first_year
             updated += 1
