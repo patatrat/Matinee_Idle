@@ -17,6 +17,11 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Configure git for mid-run checkpoints
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "Discogs Release Year Bot"
+
       - name: Run Discogs release year enrichment
         continue-on-error: true  # Always reach the commit step, even on partial failure
         env:
@@ -26,9 +31,6 @@ jobs:
 
       - name: Commit results
         run: |
-          git config user.email "action@github.com"
-          git config user.name "Discogs Release Year Bot"
-
           git add discogs_year_cache.json explorer/public/songs.json 2>/dev/null || true
 
           if ! git diff --cached --quiet; then

@@ -25,6 +25,7 @@ Set DISCOGS_TOKEN env var for higher rate limit (60/min vs 25/min).
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -41,6 +42,9 @@ DISCOGS_TOKEN = os.environ.get("DISCOGS_TOKEN", "")
 # Discogs rate limits: 25/min unauth, 60/min with token
 # Use conservative values to avoid 429s
 RATE_LIMIT = 1.1 if DISCOGS_TOKEN else 2.5
+# Commit cache to git every N fetches when running in CI
+COMMIT_EVERY = 500
+IN_CI = os.environ.get("GITHUB_ACTIONS") == "true"
 
 DRY_RUN    = "--dry-run"    in sys.argv
 APPLY_ONLY = "--apply-only" in sys.argv
@@ -147,6 +151,7 @@ def fetch_year(artist: str, title: str) -> int | None:
             return min(years)
 
     # --- Strategy 2: any release, take earliest ---
+    time.sleep(RATE_LIMIT)  # second call within same pair needs its own delay
     params["type"] = "release"
     params["per_page"] = 10
     data = _get_json(_build_req(params))
@@ -175,6 +180,28 @@ def fetch_year(artist: str, title: str) -> int | None:
 # ---------------------------------------------------------------------------
 # Cache I/O
 # ---------------------------------------------------------------------------
+
+def git_commit_cache(fetched: int, total: int):
+    """Commit the cache file to git — only runs inside GitHub Actions."""
+    if not IN_CI:
+        return
+    try:
+        subprocess.run(["git", "add", CACHE_PATH], check=True, capture_output=True)
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--quiet"], capture_output=True
+        )
+        if result.returncode == 0:
+            return  # nothing staged
+        subprocess.run(
+            ["git", "commit", "-m",
+             f"WIP: Discogs cache checkpoint ({fetched}/{total} fetched)"],
+            check=True, capture_output=True,
+        )
+        subprocess.run(["git", "push"], check=True, capture_output=True)
+        print(f"  [git] checkpoint committed ({fetched}/{total})", flush=True)
+    except subprocess.CalledProcessError as e:
+        print(f"  [git] commit failed: {e.stderr.decode().strip()}", flush=True)
+
 
 def load_cache() -> dict:
     if os.path.exists(CACHE_PATH):
@@ -273,6 +300,8 @@ def main():
 
                 if fetched % SAVE_EVERY == 0:
                     _save_and_report()
+                if fetched % COMMIT_EVERY == 0:
+                    git_commit_cache(fetched, total_to_fetch)
 
                 time.sleep(RATE_LIMIT)
 
@@ -280,6 +309,7 @@ def main():
             print("\nInterrupted — saving checkpoint…", flush=True)
         finally:
             save_cache(cache)
+            git_commit_cache(fetched, total_to_fetch)
             elapsed = time.time() - start_time
             hit_rate = matched / fetched * 100 if fetched > 0 else 0
             print(
