@@ -64,6 +64,7 @@ export default function SongCard({
     song.spotify_url ? "found" : "idle"
   );
   const [showEmbed, setShowEmbed] = useState(false);
+  const [autoStarted, setAutoStarted] = useState(false);
 
   useEffect(() => {
     if (song.spotify_url) return;
@@ -79,11 +80,14 @@ export default function SongCard({
     if (song.spotify_url) setSpotifyState("found");
   }, [song.spotify_url]);
 
-  // When this card becomes active, open the embed; when it loses active, close it
+  // When this card becomes active (via auto-advance), open embed with autoplay;
+  // when it loses active, close the embed.
   useEffect(() => {
     if (isActive && song.spotify_url) {
+      setAutoStarted(autoPlay);
       setShowEmbed(true);
     } else if (!isActive) {
+      setAutoStarted(false);
       setShowEmbed(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -130,6 +134,7 @@ export default function SongCard({
 
     if (song.spotify_url) {
       const next = !showEmbed;
+      setAutoStarted(false); // manual click — don't autostart
       setShowEmbed(next);
       if (next) onSetActive?.();
       return;
@@ -268,7 +273,7 @@ export default function SongCard({
         {showEmbed && trackId && (
           <div className="mt-2 space-y-1.5">
             <iframe
-              src={`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`}
+              src={`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0${autoStarted ? "&autoplay=1" : ""}`}
               width="100%"
               height="80"
               frameBorder="0"
