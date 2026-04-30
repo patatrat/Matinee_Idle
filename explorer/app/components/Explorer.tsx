@@ -72,6 +72,7 @@ export default function Explorer() {
   const [randomSong, setRandomSong] = useState<Song | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activePlayId, setActivePlayId] = useState<string | null>(null);
+  const [autoPlay, setAutoPlay] = useState(false);
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
 
   useEffect(() => {
@@ -590,6 +591,8 @@ export default function Explorer() {
                               onSpotifyResult={handleSpotifyResult}
                               isActive={activePlayId === s.id}
                               onSetActive={() => setActivePlayId(s.id)}
+                              autoPlay={autoPlay}
+                              onAutoPlayToggle={() => setAutoPlay(v => !v)}
                             />
                           ))}
                         </div>
@@ -645,6 +648,8 @@ export default function Explorer() {
                     isActive={activePlayId === song.id}
                     onSetActive={() => setActivePlayId(song.id)}
                     onNext={() => handleNext(song.id)}
+                    autoPlay={autoPlay}
+                    onAutoPlayToggle={() => setAutoPlay(v => !v)}
                   />
                 ))}
               </div>

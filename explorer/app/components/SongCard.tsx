@@ -44,6 +44,8 @@ export default function SongCard({
   isActive = false,
   onSetActive,
   onNext,
+  autoPlay = false,
+  onAutoPlayToggle,
 }: {
   song: Song;
   artistCount: number;
@@ -55,6 +57,8 @@ export default function SongCard({
   isActive?: boolean;
   onSetActive?: () => void;
   onNext?: () => void;
+  autoPlay?: boolean;
+  onAutoPlayToggle?: () => void;
 }) {
   const [spotifyState, setSpotifyState] = useState<SpotifyState>(
     song.spotify_url ? "found" : "idle"
@@ -84,6 +88,37 @@ export default function SongCard({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive]);
+
+  // Listen for Spotify embed postMessage events to detect track end for auto-play
+  useEffect(() => {
+    if (!showEmbed || !trackId || !onNext || !autoPlay) return;
+
+    let nearEnd = false;
+
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== "https://open.spotify.com") return;
+      let data: { type?: string; payload?: { duration?: number; position?: number; isPaused?: boolean } };
+      try {
+        data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+      } catch { return; }
+      if (data?.type !== "playback_update") return;
+
+      const { duration, position, isPaused } = data.payload ?? {};
+      if (!duration || position == null) return;
+
+      // Flag when we're in the last 3 seconds
+      if (position >= duration - 3000) nearEnd = true;
+
+      // Track ended: was near end and now paused (either at end or after position reset)
+      if (nearEnd && isPaused && (position < 1500 || position >= duration - 500)) {
+        nearEnd = false;
+        onNext!();
+      }
+    }
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [showEmbed, song.spotify_url, autoPlay, onNext]);
 
   function openSpotifySearch() {
     const q = encodeURIComponent(`${song.artist} ${song.title}`);
@@ -231,7 +266,7 @@ export default function SongCard({
 
         {/* Spotify embed */}
         {showEmbed && trackId && (
-          <div className="mt-2 space-y-1">
+          <div className="mt-2 space-y-1.5">
             <iframe
               src={`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`}
               width="100%"
@@ -241,17 +276,33 @@ export default function SongCard({
               loading="lazy"
               className="rounded-lg"
             />
-            {onNext && (
-              <button
-                onClick={onNext}
-                className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-300 transition-colors px-1"
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M6 18V6l12 6-12 6zm14-12v12h2V6h-2z"/>
-                </svg>
-                Next track
-              </button>
-            )}
+            <div className="flex items-center gap-3 px-0.5">
+              {onNext && (
+                <button
+                  onClick={onNext}
+                  className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 18V6l12 6-12 6zm14-12v12h2V6h-2z"/>
+                  </svg>
+                  Next track
+                </button>
+              )}
+              {onAutoPlayToggle && (
+                <button
+                  onClick={onAutoPlayToggle}
+                  title={autoPlay ? "Auto-play on — click to turn off" : "Auto-play off — click to turn on"}
+                  className={`flex items-center gap-1.5 text-xs transition-colors ${
+                    autoPlay ? "text-green-400 hover:text-green-300" : "text-neutral-600 hover:text-neutral-400"
+                  }`}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                  Auto-play {autoPlay ? "on" : "off"}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
