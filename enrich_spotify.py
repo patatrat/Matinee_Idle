@@ -26,6 +26,7 @@ HERE        = os.path.dirname(os.path.abspath(__file__))
 SONGS_PATH  = os.path.join(HERE, "explorer/public/songs.json")
 SONGS_BACK  = SONGS_PATH + ".bak"
 CHECKPOINT  = os.path.join(HERE, "spotify_cache.json")
+QUOTA_FILE  = os.path.join(HERE, "spotify_quota_reset.txt")
 
 CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID",     "f3bcd797aeaa4a50bcb6132366835d64")
 CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "30e26fd9d30844d08b94dced12fe380d")
@@ -37,6 +38,33 @@ DRY_RUN     = "--dry-run" in sys.argv
 SAFE_MODE   = "--safe" in sys.argv  # further reduce rate limit
 if SAFE_MODE:
     RATE_LIMIT = 1.0  # ~1 req/sec for safety
+
+
+# ── quota tracking ──────────────────────────────────────────────────────────
+
+def quota_still_cooling() -> bool:
+    """Return True (and print why) if the quota reset time hasn't passed yet."""
+    if not os.path.exists(QUOTA_FILE):
+        return False
+    try:
+        reset_at = float(open(QUOTA_FILE).read().strip())
+        remaining = reset_at - time.time()
+        if remaining > 0:
+            h, m = int(remaining // 3600), int((remaining % 3600) // 60)
+            print(f"Quota still cooling — resets in {h}h {m}m. Skipping this run.")
+            return True
+        os.remove(QUOTA_FILE)  # past reset time — clean up
+        return False
+    except Exception:
+        return False
+
+def record_quota_exhausted(retry_after: int):
+    reset_at = time.time() + retry_after
+    with open(QUOTA_FILE, "w") as f:
+        f.write(str(reset_at))
+    import datetime
+    reset_str = datetime.datetime.utcfromtimestamp(reset_at).strftime("%Y-%m-%d %H:%M UTC")
+    print(f"Quota reset time recorded: {reset_str} ({retry_after // 3600}h {(retry_after % 3600) // 60}m from now)")
 
 
 # ── token management ────────────────────────────────────────────────────────
@@ -135,9 +163,10 @@ def search_track(artist: str, title: str) -> list:
         if e.code == 429:
             retry_after = int(e.headers.get("Retry-After", 5))
             if retry_after > MAX_RETRY_AFTER:
+                record_quota_exhausted(retry_after)
                 raise RuntimeError(
-                    f"Spotify daily quota likely exhausted (Retry-After: {retry_after}s). "
-                    "Wait until tomorrow and rerun — the checkpoint will resume from here."
+                    f"Spotify daily quota exhausted (Retry-After: {retry_after}s). "
+                    "Reset time recorded — next run will skip until quota is available."
                 )
             print(f"  Rate limited — sleeping {retry_after}s")
             time.sleep(retry_after)
@@ -184,6 +213,9 @@ def cache_key(song: dict) -> str:
 # ── main ─────────────────────────────────────────────────────────────────────
 
 def main():
+    if quota_still_cooling():
+        return
+
     print(f"Reading from: {SONGS_PATH}")
     songs = json.load(open(SONGS_PATH))
 

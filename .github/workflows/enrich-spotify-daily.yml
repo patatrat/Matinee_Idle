@@ -2,8 +2,9 @@ name: Daily Spotify Enrichment
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # 6am UTC daily — after Spotify quota resets (~4:55am UTC)
-  workflow_dispatch:      # Allow manual trigger from Actions tab
+    - cron: '0 */4 * * *'  # Every 4 hours — quota reset time shifts daily, script
+                            # self-skips via spotify_quota_reset.txt until it's ready
+  workflow_dispatch:        # Allow manual trigger from Actions tab
 
 jobs:
   enrich:
@@ -34,13 +35,13 @@ jobs:
           git config user.name "Spotify Enrichment Bot"
 
           # Check if there are any changes to commit
-          if git diff --quiet spotify_cache.json explorer/public/songs.json 2>/dev/null; then
+          if git diff --quiet spotify_cache.json explorer/public/songs.json spotify_quota_reset.txt 2>/dev/null; then
             echo "No changes to commit"
             exit 0
           fi
 
           # Add only the enrichment files (don't commit unrelated changes)
-          git add spotify_cache.json explorer/public/songs.json 2>/dev/null || true
+          git add spotify_cache.json explorer/public/songs.json spotify_quota_reset.txt 2>/dev/null || true
 
           # Commit if there are staged changes
           if ! git diff --cached --quiet; then
