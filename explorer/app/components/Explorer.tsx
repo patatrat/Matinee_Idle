@@ -71,6 +71,8 @@ export default function Explorer() {
   const [expandedCovers, setExpandedCovers] = useState<Set<string>>(new Set());
   const [randomSong, setRandomSong] = useState<Song | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activePlayId, setActivePlayId] = useState<string | null>(null);
+  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
 
   useEffect(() => {
     fetch("/songs.json")
@@ -297,25 +299,34 @@ export default function Explorer() {
     );
   }, []);
 
+  const handleNext = useCallback((currentId: string) => {
+    const withLinks = filtered.filter((s) => s.spotify_url);
+    if (withLinks.length <= 1) return;
+    const idx = withLinks.findIndex((s) => s.id === currentId);
+    const next = withLinks[idx === -1 ? 0 : (idx + 1) % withLinks.length];
+    setActivePlayId(next.id);
+    const allIdx = filtered.findIndex((s) => s.id === next.id);
+    if (allIdx >= 0) setPage(Math.floor(allIdx / PAGE_SIZE) + 1);
+  }, [filtered]);
+
+  const handleCopyPlaylist = useCallback(async () => {
+    const urls = filtered
+      .filter((s) => s.spotify_url)
+      .map((s) => s.spotify_url as string);
+    if (!urls.length) return;
+    try {
+      await navigator.clipboard.writeText(urls.join("\n"));
+      setCopyState("copied");
+      setTimeout(() => setCopyState("idle"), 2000);
+    } catch {
+      /* clipboard blocked — do nothing */
+    }
+  }, [filtered]);
+
   const pickRandom = useCallback(() => {
     const pool = filtered.length > 0 ? filtered : songs;
     setRandomSong(pool[Math.floor(Math.random() * pool.length)]);
   }, [filtered, songs]);
-
-  // Spotify search link for the filtered view
-  const spotifySearchUrl = useMemo(() => {
-    const parts: string[] = [];
-    if (genreFilters.size === 1) parts.push(`genre:${[...genreFilters][0]}`);
-    if (yearFilter !== "all") parts.push(`year:${yearFilter}`);
-    if (decadeFilter !== null) {
-      const d = DECADES.find((d) => d.lo === decadeFilter);
-      if (d && d.hi < 9999) parts.push(`year:${d.lo}-${d.hi}`);
-    }
-    if (artistFilter) parts.push(artistFilter);
-    if (query) parts.push(query);
-    const q = parts.length ? parts.join(" ") : "matinee idle radio new zealand";
-    return `https://open.spotify.com/search/${encodeURIComponent(q)}`;
-  }, [genreFilters, yearFilter, decadeFilter, artistFilter, query]);
 
   const spotifyWithLinks = useMemo(
     () => filtered.filter((s) => s.spotify_url).length,
@@ -503,20 +514,21 @@ export default function Explorer() {
             </div>
           )}
 
-          {/* Spotify open button — only shown in songs view with meaningful filters */}
-          {!loading && view === "songs" && (artistFilter || genreFilters.size > 0 || query.trim()) && (
+          {/* Copy-to-playlist button — shown in songs view whenever there are linked tracks */}
+          {!loading && view === "songs" && spotifyWithLinks > 0 && (
             <div className="px-4 sm:px-6 pt-3">
-              <a
-                href={spotifySearchUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={handleCopyPlaylist}
+                title="Copy track URLs to clipboard, then paste into a Spotify playlist"
                 className="inline-flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-400 hover:bg-neutral-800 hover:text-white transition-colors"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-green-400">
                   <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
                 </svg>
-                {`Search on Spotify${spotifyWithLinks > 0 ? ` · ${spotifyWithLinks} direct links` : ""}`}
-              </a>
+                {copyState === "copied"
+                  ? `Copied ${spotifyWithLinks} tracks!`
+                  : `Copy ${spotifyWithLinks} tracks for Spotify playlist`}
+              </button>
             </div>
           )}
 
@@ -563,31 +575,22 @@ export default function Explorer() {
                         </span>
                       </button>
 
-                      {/* Expandable version list */}
+                      {/* Expandable version list — rendered as full SongCards */}
                       {isOpen && (
-                        <div className="mt-3 ml-6 flex flex-col gap-1">
+                        <div className="mt-2 ml-4 border-l-2 border-neutral-800 pl-2">
                           {versions.map((s) => (
-                            <div key={s.id} className="flex items-center gap-2 py-1.5 border-l-2 border-neutral-800 pl-3">
-                              <div className="flex-1 min-w-0">
-                                <button
-                                  onClick={() => { setView("songs"); handleArtistClick(s.artist); }}
-                                  className="text-sm text-neutral-300 hover:text-white hover:underline text-left transition-colors"
-                                >
-                                  {s.artist}
-                                </button>
-                                {(s.release_year || s.air_year) && (
-                                  <span className="ml-2 text-xs text-neutral-600">
-                                    {s.release_year ? `${s.release_year}` : `played ${s.air_year}`}
-                                  </span>
-                                )}
-                                {s.genre && (
-                                  <span className="ml-2 text-xs text-neutral-700">{s.genre}</span>
-                                )}
-                              </div>
-                              <span className="text-xs text-neutral-700 shrink-0">
-                                {s.air_year}
-                              </span>
-                            </div>
+                            <SongCard
+                              key={s.id}
+                              song={s}
+                              artistCount={artistCounts[normalize(s.artist)] ?? 1}
+                              playCount={songPlayCounts[`${s.artist}|||${s.title}`] ?? 1}
+                              onArtistClick={(a) => { setView("songs"); handleArtistClick(a); }}
+                              onGenreClick={handleGenreClick}
+                              onReleaseYearClick={handleReleaseYearClick}
+                              onSpotifyResult={handleSpotifyResult}
+                              isActive={activePlayId === s.id}
+                              onSetActive={() => setActivePlayId(s.id)}
+                            />
                           ))}
                         </div>
                       )}
@@ -639,6 +642,9 @@ export default function Explorer() {
                     onGenreClick={handleGenreClick}
                     onReleaseYearClick={handleReleaseYearClick}
                     onSpotifyResult={handleSpotifyResult}
+                    isActive={activePlayId === song.id}
+                    onSetActive={() => setActivePlayId(song.id)}
+                    onNext={() => handleNext(song.id)}
                   />
                 ))}
               </div>

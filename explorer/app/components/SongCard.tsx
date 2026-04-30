@@ -41,6 +41,9 @@ export default function SongCard({
   onGenreClick,
   onReleaseYearClick,
   onSpotifyResult,
+  isActive = false,
+  onSetActive,
+  onNext,
 }: {
   song: Song;
   artistCount: number;
@@ -49,6 +52,9 @@ export default function SongCard({
   onGenreClick: (genre: string) => void;
   onReleaseYearClick: (year: number) => void;
   onSpotifyResult: (artist: string, title: string, url: string) => void;
+  isActive?: boolean;
+  onSetActive?: () => void;
+  onNext?: () => void;
 }) {
   const [spotifyState, setSpotifyState] = useState<SpotifyState>(
     song.spotify_url ? "found" : "idle"
@@ -69,6 +75,16 @@ export default function SongCard({
     if (song.spotify_url) setSpotifyState("found");
   }, [song.spotify_url]);
 
+  // When this card becomes active, open the embed; when it loses active, close it
+  useEffect(() => {
+    if (isActive && song.spotify_url) {
+      setShowEmbed(true);
+    } else if (!isActive) {
+      setShowEmbed(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
+
   function openSpotifySearch() {
     const q = encodeURIComponent(`${song.artist} ${song.title}`);
     window.open(`https://open.spotify.com/search/${q}`, "_blank", "noopener,noreferrer");
@@ -78,7 +94,9 @@ export default function SongCard({
     if (spotifyState === "loading") return;
 
     if (song.spotify_url) {
-      setShowEmbed((v) => !v);
+      const next = !showEmbed;
+      setShowEmbed(next);
+      if (next) onSetActive?.();
       return;
     }
 
@@ -107,6 +125,7 @@ export default function SongCard({
       onSpotifyResult(song.artist, song.title, url);
       setSpotifyState("found");
       setShowEmbed(true);
+      onSetActive?.();
     } catch {
       openSpotifySearch();
       setSpotifyState("error");
@@ -133,7 +152,9 @@ export default function SongCard({
   const trackId = song.spotify_url?.split("/track/")[1]?.split("?")[0];
 
   return (
-    <div className="group flex gap-3 rounded-xl px-3 py-3 hover:bg-neutral-900 transition-colors">
+    <div className={`group flex gap-3 rounded-xl px-3 py-3 transition-colors ${
+      isActive ? "bg-neutral-800/80" : "hover:bg-neutral-900"
+    }`}>
       {/* Genre colour bar */}
       <div className={`w-1 self-stretch rounded-full shrink-0 ${genreBar} opacity-70 group-hover:opacity-100 transition-opacity`} />
 
@@ -150,14 +171,31 @@ export default function SongCard({
           <Count n={artistCount} title={`${artistCount} songs by this artist`} />
         </div>
 
-        {/* Row 2: Title (clickable → Spotify) + play count */}
-        <div className="flex items-center gap-2 flex-wrap mt-0.5">
+        {/* Row 2: Title + Spotify icon (inline) + play count */}
+        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
           <button
             onClick={handleSpotifyClick}
             title={spotifyTitle}
             className="text-base font-medium text-neutral-100 hover:underline text-left leading-snug"
           >
             {song.title}
+          </button>
+          <button
+            onClick={handleSpotifyClick}
+            disabled={spotifyState === "loading" || spotifyState === "not_found"}
+            className={`shrink-0 transition-colors ${spotifyIconColor}`}
+            aria-label={spotifyTitle}
+            title={spotifyTitle}
+          >
+            {spotifyState === "loading" ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="animate-spin">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="40 20" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
+              </svg>
+            )}
           </button>
           <Count n={playCount} title={`Played ${playCount} times on the show`} />
         </div>
@@ -193,7 +231,7 @@ export default function SongCard({
 
         {/* Spotify embed */}
         {showEmbed && trackId && (
-          <div className="mt-2">
+          <div className="mt-2 space-y-1">
             <iframe
               src={`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`}
               width="100%"
@@ -203,28 +241,20 @@ export default function SongCard({
               loading="lazy"
               className="rounded-lg"
             />
+            {onNext && (
+              <button
+                onClick={onNext}
+                className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-300 transition-colors px-1"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M6 18V6l12 6-12 6zm14-12v12h2V6h-2z"/>
+                </svg>
+                Next track
+              </button>
+            )}
           </div>
         )}
       </div>
-
-      {/* Spotify icon button */}
-      <button
-        onClick={handleSpotifyClick}
-        disabled={spotifyState === "loading" || spotifyState === "not_found"}
-        className={`shrink-0 mt-1 transition-colors ${spotifyIconColor}`}
-        aria-label={spotifyTitle}
-        title={spotifyTitle}
-      >
-        {spotifyState === "loading" ? (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="animate-spin">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="40 20" />
-          </svg>
-        ) : (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-          </svg>
-        )}
-      </button>
     </div>
   );
 }
