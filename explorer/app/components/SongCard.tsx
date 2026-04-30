@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Song } from "./Explorer";
 import { GENRE_CONFIG, FALLBACK_BAR } from "../lib/genres";
 
@@ -65,6 +65,7 @@ export default function SongCard({
   );
   const [showEmbed, setShowEmbed] = useState(false);
   const [autoStarted, setAutoStarted] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     if (song.spotify_url) return;
@@ -123,6 +124,16 @@ export default function SongCard({
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [showEmbed, song.spotify_url, autoPlay, onNext]);
+
+  function handleIframeLoad() {
+    if (!autoStarted || !iframeRef.current?.contentWindow) return;
+    // autoplay=1 in the URL covers Chrome/Edge; postMessage covers Firefox,
+    // which blocks cross-origin iframe autoplay via URL param alone.
+    // 300ms gives the embed JS time to initialise before accepting commands.
+    setTimeout(() => {
+      iframeRef.current?.contentWindow?.postMessage({ command: "play" }, "*");
+    }, 300);
+  }
 
   function openSpotifySearch() {
     const q = encodeURIComponent(`${song.artist} ${song.title}`);
@@ -273,12 +284,14 @@ export default function SongCard({
         {showEmbed && trackId && (
           <div className="mt-2 space-y-1.5">
             <iframe
+              ref={iframeRef}
+              onLoad={handleIframeLoad}
               src={`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0${autoStarted ? "&autoplay=1" : ""}`}
               width="100%"
               height="80"
               frameBorder="0"
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              loading="lazy"
+              loading="eager"
               className="rounded-lg"
             />
             <div className="flex items-center gap-3 px-0.5">
