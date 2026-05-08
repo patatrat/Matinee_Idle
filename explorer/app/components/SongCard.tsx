@@ -127,12 +127,13 @@ export default function SongCard({
 
   function handleIframeLoad() {
     if (!autoStarted || !iframeRef.current?.contentWindow) return;
-    // autoplay=1 in the URL covers Chrome/Edge; postMessage covers Firefox,
-    // which blocks cross-origin iframe autoplay via URL param alone.
-    // 300ms gives the embed JS time to initialise before accepting commands.
+    // Wait for the embed to authenticate the user's Spotify session before
+    // sending the play command. autoplay=1 in the URL fires before auth
+    // completes and falls back to 30s preview even for Premium users.
+    // 1500ms is enough for the embed JS to load and complete auth on most connections.
     setTimeout(() => {
       iframeRef.current?.contentWindow?.postMessage({ command: "play" }, "*");
-    }, 300);
+    }, 1500);
   }
 
   function openSpotifySearch() {
@@ -286,7 +287,7 @@ export default function SongCard({
             <iframe
               ref={iframeRef}
               onLoad={handleIframeLoad}
-              src={`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0${autoStarted ? "&autoplay=1" : ""}`}
+              src={`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`}
               width="100%"
               height="80"
               frameBorder="0"
