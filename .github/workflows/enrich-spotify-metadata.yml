@@ -1,11 +1,12 @@
 name: Spotify Metadata Backfill
 
 on:
-  workflow_dispatch:        # Manual trigger only — run once to fill gaps
+  workflow_dispatch:        # Manual trigger only
 
 jobs:
   enrich:
     runs-on: ubuntu-latest
+    timeout-minutes: 300    # 5 hour cap; script saves progress and exits cleanly on rate limit
     permissions:
       contents: write
     steps:
@@ -16,7 +17,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Backfill release_year from Spotify track data
+      - name: Backfill release_year and genre from Spotify
         env:
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
@@ -24,44 +25,19 @@ jobs:
         run: |
           cd "$GITHUB_WORKSPACE"
           python3 enrich_spotify_metadata.py
-        continue-on-error: true  # saves progress and exits cleanly on rate limit
+        continue-on-error: true  # saves progress on rate limit, still commits
 
-      - name: Backfill genre for unmatched songs via Last.fm
-        env:
-          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
-          PYTHONUNBUFFERED: "1"
-        run: |
-          cd "$GITHUB_WORKSPACE"
-          # Target songs with genre="unmatched" by temporarily treating them as missing
-          python3 -c "
-import json, shutil
-path = 'explorer/public/songs.json'
-songs = json.load(open(path))
-changed = 0
-for s in songs:
-    if s.get('genre') == 'unmatched':
-        s['genre'] = None
-        changed += 1
-shutil.copy(path, path + '.bak')
-json.dump(songs, open(path, 'w'), separators=(',', ':'))
-print(f'Cleared genre for {changed} unmatched songs — ready for Last.fm pass')
-"
-          python3 enrich_genres_missing.py --skip-claude
-        continue-on-error: true
-
-      - name: Commit and push updated songs.json
+      - name: Commit and push updated files
         run: |
           git config user.email "action@github.com"
           git config user.name "Spotify Enrichment Bot"
 
-          if git diff --quiet explorer/public/songs.json; then
-            echo "No changes to commit"
-            exit 0
-          fi
+          git add explorer/public/songs.json spotify_artist_genre_cache.json 2>/dev/null || true
 
-          git add explorer/public/songs.json
           if ! git diff --cached --quiet; then
-            git commit -m "chore: backfill release_year and genre (Spotify + Last.fm)"
+            git commit -m "chore: backfill release_year and genre from Spotify metadata"
             git pull --rebase origin main
             git push
+          else
+            echo "No changes to commit"
           fi
