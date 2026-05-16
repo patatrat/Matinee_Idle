@@ -1,0 +1,43 @@
+name: Spotify Metadata Backfill
+
+on:
+  workflow_dispatch:        # Manual trigger only — run once to fill gaps
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Backfill release_year and genre from Spotify
+        env:
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python3 enrich_spotify_metadata.py
+
+      - name: Commit and push updated songs.json
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "Spotify Enrichment Bot"
+
+          if git diff --quiet explorer/public/songs.json; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git add explorer/public/songs.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: backfill release_year and genre from Spotify metadata"
+            git pull --rebase origin main
+            git push
+          fi
