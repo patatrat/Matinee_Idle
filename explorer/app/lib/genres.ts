@@ -30,6 +30,7 @@ export const GENRE_CONFIG: Record<string, GenreConfig> = {
   "world":            { bar: "bg-cyan-600",    dot: "bg-cyan-600",    pill: "bg-cyan-950 text-cyan-300"       },
   "classical":        { bar: "bg-stone-400",   dot: "bg-stone-400",   pill: "bg-stone-900 text-stone-300"     },
   "soundtrack":       { bar: "bg-indigo-500",  dot: "bg-indigo-500",  pill: "bg-indigo-950 text-indigo-300"   },
+  "unmatched":        { bar: "bg-neutral-600", dot: "bg-neutral-600", pill: "bg-neutral-900 text-neutral-400"  },
 };
 
 export const FALLBACK_BAR = "bg-neutral-800";
@@ -62,6 +63,7 @@ export const GENRE_HEX: Record<string, string> = {
   "world":            "#0891b2",
   "classical":        "#a8a29e",
   "soundtrack":       "#6366f1",
+  "unmatched":        "#737373",
 };
 
 export const FALLBACK_HEX = "#404040";
