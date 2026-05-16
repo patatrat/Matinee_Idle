@@ -135,10 +135,15 @@ def get_token() -> str:
             "Content-Type": "application/x-www-form-urlencoded",
         },
     )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        data = json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")
+        raise RuntimeError(f"Token fetch failed ({e.code}): {body[:300]}") from e
     _token = data["access_token"]
     _token_expiry = time.time() + data["expires_in"]
+    print(f"Token acquired (expires in {data['expires_in']}s)")
     return _token
 
 
@@ -153,6 +158,12 @@ def spotify_get(path: str) -> dict:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 return json.loads(resp.read())
         except urllib.error.HTTPError as e:
+            body = ""
+            try:
+                body = e.read().decode(errors="replace")
+            except Exception:
+                pass
+            print(f"  HTTP {e.code} on {path[:80]}: {body[:300]}")
             if e.code == 429:
                 retry_after = int(e.headers.get("Retry-After", 10))
                 print(f"  Rate limited — waiting {retry_after}s …")
