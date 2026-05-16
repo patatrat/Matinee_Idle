@@ -31,7 +31,6 @@ SONGS_BACK = SONGS_PATH + ".bak"
 CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID",     "f3bcd797aeaa4a50bcb6132366835d64")
 CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "30e26fd9d30844d08b94dced12fe380d")
 
-BATCH      = 50      # Spotify max IDs per /tracks or /artists call
 RATE_LIMIT = 0.6     # seconds between API calls
 DRY_RUN    = "--dry-run" in sys.argv
 SAVE_EVERY = 200
@@ -220,70 +219,57 @@ def main():
     print(f"Valid Spotify track IDs    : {len(target_songs)}")
     print()
 
-    # ── Pass 1: Fetch track data (release date + artist IDs) ─────────────────
+    # ── Combined pass: individual track + artist lookups ─────────────────────
+    # Uses /tracks/{id} and /artists/{id} (individual endpoints) instead of
+    # batch endpoints, which require elevated API access.
 
-    year_updates   = 0
-    artist_id_map  = {}  # song_id → list of artist IDs (first artist)
-    batches = [target_songs[i:i+BATCH] for i in range(0, len(target_songs), BATCH)]
-
-    print(f"Pass 1: fetching track data ({len(batches)} batches of up to {BATCH}) …")
-    for b_idx, batch in enumerate(batches):
-        ids_param = ",".join(tid for _, tid in batch)
-        data = spotify_get(f"/tracks?ids={ids_param}")
-        for (song_id, _), track in zip(batch, data["tracks"]):
-            if track is None:
-                continue
-            song = by_id[song_id]
-            # release year
-            if song_id in need_year:
-                yr = release_year_from_date(track.get("album", {}).get("release_date", ""))
-                if yr:
-                    song["release_year"] = yr
-                    year_updates += 1
-            # collect artist IDs for genre pass (use first artist)
-            artist_ids = [a["id"] for a in track.get("artists", []) if a.get("id")]
-            if artist_ids and song_id in need_genre:
-                artist_id_map[song_id] = artist_ids[0]
-
-        if b_idx % 10 == 0:
-            print(f"  batch {b_idx+1}/{len(batches)} — year updates so far: {year_updates}")
-        time.sleep(RATE_LIMIT)
-
-    print(f"Pass 1 done. release_year filled: {year_updates}")
-    print()
-
-    # ── Pass 2: Fetch artist genres ───────────────────────────────────────────
-
+    year_updates  = 0
     genre_updates = 0
-    unique_artist_ids = list(set(artist_id_map.values()))
-    artist_genre_map  = {}  # artist_id → canonical genre
+    artist_cache  = {}  # artist_id → canonical genre (avoid duplicate lookups)
 
-    artist_batches = [unique_artist_ids[i:i+BATCH]
-                      for i in range(0, len(unique_artist_ids), BATCH)]
+    print(f"Fetching track + artist data ({len(target_songs)} songs) …")
+    for i, (song_id, track_id) in enumerate(target_songs):
+        song = by_id[song_id]
 
-    print(f"Pass 2: fetching artist genres ({len(artist_batches)} batches, {len(unique_artist_ids)} unique artists) …")
-    for b_idx, batch in enumerate(artist_batches):
-        ids_param = ",".join(batch)
-        data = spotify_get(f"/artists?ids={ids_param}")
-        for artist in data["artists"]:
-            if artist is None:
-                continue
-            canon = spotify_genre(artist.get("genres", []))
-            if canon:
-                artist_genre_map[artist["id"]] = canon
+        # ── Track lookup ──────────────────────────────────────────────────────
+        try:
+            track = spotify_get(f"/tracks/{track_id}")
+        except Exception as e:
+            print(f"  [{i+1}] track {track_id} error: {e}")
+            time.sleep(RATE_LIMIT)
+            continue
 
-        if b_idx % 5 == 0:
-            print(f"  batch {b_idx+1}/{len(artist_batches)}")
+        # release year
+        if song_id in need_year:
+            yr = release_year_from_date(track.get("album", {}).get("release_date", ""))
+            if yr:
+                song["release_year"] = yr
+                year_updates += 1
+
+        # ── Artist lookup for genre ───────────────────────────────────────────
+        if song_id in need_genre:
+            artist_ids = [a["id"] for a in track.get("artists", []) if a.get("id")]
+            if artist_ids:
+                artist_id = artist_ids[0]
+                if artist_id not in artist_cache:
+                    time.sleep(RATE_LIMIT)
+                    try:
+                        artist = spotify_get(f"/artists/{artist_id}")
+                        artist_cache[artist_id] = spotify_genre(artist.get("genres", []))
+                    except Exception as e:
+                        print(f"  [{i+1}] artist {artist_id} error: {e}")
+                        artist_cache[artist_id] = None
+                canon = artist_cache[artist_id]
+                if canon:
+                    song["genre"] = canon
+                    genre_updates += 1
+
+        if (i + 1) % 100 == 0:
+            print(f"  {i+1}/{len(target_songs)} — +{year_updates} years, +{genre_updates} genres")
+
         time.sleep(RATE_LIMIT)
 
-    # Apply artist genres to songs
-    for song_id, artist_id in artist_id_map.items():
-        canon = artist_genre_map.get(artist_id)
-        if canon:
-            by_id[song_id]["genre"] = canon
-            genre_updates += 1
-
-    print(f"Pass 2 done. genre filled: {genre_updates} / {len(need_genre)} targets")
+    print(f"Done. release_year filled: {year_updates}, genre filled: {genre_updates} / {len(need_genre)}")
     print()
 
     # ── Save ──────────────────────────────────────────────────────────────────
