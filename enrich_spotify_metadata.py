@@ -29,15 +29,42 @@ HERE          = os.path.dirname(os.path.abspath(__file__))
 SONGS_PATH    = os.path.join(HERE, "explorer/public/songs.json")
 SONGS_BACK    = SONGS_PATH + ".bak"
 ARTIST_CACHE  = os.path.join(HERE, "spotify_artist_genre_cache.json")
+QUOTA_FILE    = os.path.join(HERE, "spotify_quota_reset.txt")  # shared with enrich_spotify.py
 
 CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID",     "f3bcd797aeaa4a50bcb6132366835d64")
 CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "30e26fd9d30844d08b94dced12fe380d")
 
 TRACK_RATE    = 0.6    # seconds between track calls
 ARTIST_RATE   = 3.0    # seconds between artist calls (much more conservative)
-MAX_WAIT      = 300    # if Retry-After > this, save and exit cleanly
+MAX_WAIT      = 300    # if Retry-After > this, record quota reset time and exit
 SAVE_EVERY    = 250
 DRY_RUN       = "--dry-run" in sys.argv
+
+
+# ── Quota tracking (shared with enrich_spotify.py) ───────────────────────────
+
+def quota_still_cooling() -> bool:
+    if not os.path.exists(QUOTA_FILE):
+        return False
+    try:
+        reset_at = float(open(QUOTA_FILE).read().strip())
+        remaining = reset_at - time.time()
+        if remaining > 0:
+            h, m = int(remaining // 3600), int((remaining % 3600) // 60)
+            print(f"Quota still cooling — resets in {h}h {m}m. Skipping this run.")
+            return True
+        os.remove(QUOTA_FILE)
+        return False
+    except Exception:
+        return False
+
+
+def record_quota_reset(retry_after: int):
+    import datetime
+    reset_at = time.time() + retry_after
+    open(QUOTA_FILE, "w").write(str(reset_at))
+    reset_str = datetime.datetime.utcfromtimestamp(reset_at).strftime("%Y-%m-%d %H:%M UTC")
+    print(f"Quota exhausted. Will reset at {reset_str} ({retry_after//3600}h {(retry_after%3600)//60}m)")
 
 
 # ── Canonical genre mapping ───────────────────────────────────────────────────
@@ -170,7 +197,7 @@ def spotify_get(path: str, rate: float) -> dict | None:
             if e.code == 429:
                 retry_after = int(e.headers.get("Retry-After", 10))
                 if retry_after > MAX_WAIT:
-                    print(f"  429 Retry-After={retry_after}s exceeds {MAX_WAIT}s cap — aborting phase")
+                    record_quota_reset(retry_after)
                     raise SystemExit(0)
                 print(f"  429 — waiting {retry_after}s …")
                 time.sleep(retry_after)
@@ -219,6 +246,9 @@ def main():
     print(f"Total unique targets       : {len(targets)}")
 
     if DRY_RUN:
+        return
+
+    if quota_still_cooling():
         return
 
     target_list = [(sid, track_id_from_url(by_id[sid]["spotify_url"]))

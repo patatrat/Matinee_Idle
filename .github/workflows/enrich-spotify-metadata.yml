@@ -32,7 +32,7 @@ jobs:
           git config user.email "action@github.com"
           git config user.name "Spotify Enrichment Bot"
 
-          git add explorer/public/songs.json spotify_artist_genre_cache.json 2>/dev/null || true
+          git add explorer/public/songs.json spotify_artist_genre_cache.json spotify_quota_reset.txt 2>/dev/null || true
 
           if ! git diff --cached --quiet; then
             git commit -m "chore: backfill release_year and genre from Spotify metadata"
