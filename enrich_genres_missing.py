@@ -42,6 +42,11 @@ SONGS_BACKUP  = SONGS_PATH + ".bak"
 CACHE_PATH    = os.path.join(HERE, "lastfm_missing_cache.json")
 LASTFM_KEY    = os.environ.get("LASTFM_API_KEY", "68aae586eac1ab54f7cf77fa6ca9f9a7")
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+DEEPSEEK_KEY  = os.environ.get("DEEPSEEK_API_KEY", "")
+
+# When DEEPSEEK_API_KEY is set it takes priority over ANTHROPIC_API_KEY.
+# DeepSeek uses the OpenAI-compatible chat/completions endpoint.
+USE_DEEPSEEK  = bool(DEEPSEEK_KEY)
 
 DRY_RUN      = "--dry-run"     in sys.argv
 SKIP_LASTFM  = "--skip-lastfm" in sys.argv
@@ -357,27 +362,51 @@ def _claude_batch(batch: list[dict]) -> list[str | None]:
         }
         for s in batch
     ]
-    payload = json.dumps({
-        "model": "claude-haiku-4-5-20251001",
-        "max_tokens": 512,
-        "system": _SYSTEM,
-        "messages": [
-            {"role": "user", "content": f"Classify these {len(items)} songs:\n{json.dumps(items, ensure_ascii=False)}"}
-        ],
-    }).encode()
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=payload,
-        method="POST",
-        headers={
-            "x-api-key": ANTHROPIC_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=90) as resp:
-        data = json.loads(resp.read())
-    text = data["content"][0]["text"].strip()
+    user_msg = f"Classify these {len(items)} songs:\n{json.dumps(items, ensure_ascii=False)}"
+
+    if USE_DEEPSEEK:
+        payload = json.dumps({
+            "model": "deepseek-chat",
+            "max_tokens": 512,
+            "messages": [
+                {"role": "system", "content": _SYSTEM},
+                {"role": "user", "content": user_msg},
+            ],
+        }).encode()
+        req = urllib.request.Request(
+            "https://api.deepseek.com/v1/chat/completions",
+            data=payload,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {DEEPSEEK_KEY}",
+                "content-type": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            data = json.loads(resp.read())
+        text = data["choices"][0]["message"]["content"].strip()
+    else:
+        payload = json.dumps({
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 512,
+            "system": _SYSTEM,
+            "messages": [
+                {"role": "user", "content": user_msg}
+            ],
+        }).encode()
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=payload,
+            method="POST",
+            headers={
+                "x-api-key": ANTHROPIC_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            data = json.loads(resp.read())
+        text = data["content"][0]["text"].strip()
     # Strip any markdown fences Claude might add despite instructions
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.MULTILINE).strip()
     raw = json.loads(text)
@@ -452,8 +481,9 @@ def main():
         print(f"  Assigned: {p2}  |  have genre: {after2}  |  still missing: {len(songs) - after2}\n")
 
     # ── Pass 3 ──────────────────────────────────────────────────────────────
-    if SKIP_CLAUDE or not ANTHROPIC_KEY:
-        label = "SKIPPED" if SKIP_CLAUDE else "no ANTHROPIC_API_KEY"
+    has_llm_key = bool(DEEPSEEK_KEY or ANTHROPIC_KEY)
+    if SKIP_CLAUDE or not has_llm_key:
+        label = "SKIPPED" if SKIP_CLAUDE else "no DEEPSEEK_API_KEY or ANTHROPIC_API_KEY"
         print(f"── Pass 3: Claude ─ {label} ──────────────────────────────────────\n")
         p3 = 0
     else:
