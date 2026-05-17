@@ -367,7 +367,7 @@ def _claude_batch(batch: list[dict]) -> list[str | None]:
     if USE_DEEPSEEK:
         payload = json.dumps({
             "model": "deepseek-v4-flash",
-            "max_tokens": 512,
+            "max_tokens": 4096,
             "messages": [
                 {"role": "system", "content": _SYSTEM},
                 {"role": "user", "content": user_msg},
@@ -382,8 +382,15 @@ def _claude_batch(batch: list[dict]) -> list[str | None]:
                 "content-type": "application/json",
             },
         )
-        with urllib.request.urlopen(req, timeout=90) as resp:
-            data = json.loads(resp.read())
+        try:
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                raw_body = resp.read()
+        except urllib.error.HTTPError as e:
+            raise ValueError(f"DeepSeek HTTP {e.code}: {e.read()[:300]!r}")
+        try:
+            data = json.loads(raw_body)
+        except json.JSONDecodeError:
+            raise ValueError(f"DeepSeek returned non-JSON: {raw_body[:200]!r}")
         text = data["choices"][0]["message"]["content"].strip()
     else:
         payload = json.dumps({
@@ -409,7 +416,12 @@ def _claude_batch(batch: list[dict]) -> list[str | None]:
         text = data["content"][0]["text"].strip()
     # Strip any markdown fences Claude might add despite instructions
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.MULTILINE).strip()
-    raw = json.loads(text)
+    if not text:
+        raise ValueError(f"Model returned empty content. Full response: {data}")
+    try:
+        raw = json.loads(text)
+    except json.JSONDecodeError:
+        raise ValueError(f"Model returned non-JSON content: {text[:300]!r}")
     return [
         (g.lower().strip() if g and g.lower().strip() in CANONICAL else None)
         for g in raw
@@ -419,7 +431,8 @@ def _claude_batch(batch: list[dict]) -> list[str | None]:
 def pass3_claude(songs: list) -> int:
     ungenred = [s for s in songs if not has_genre(s)]
     total = len(ungenred)
-    print(f"  Claude: {total} songs  →  {(total + CLAUDE_BATCH - 1) // CLAUDE_BATCH} batches")
+    backend = "DeepSeek" if USE_DEEPSEEK else "Claude"
+    print(f"  {backend}: {total} songs  →  {(total + CLAUDE_BATCH - 1) // CLAUDE_BATCH} batches")
 
     if DRY_RUN:
         return 0
@@ -487,7 +500,8 @@ def main():
         print(f"── Pass 3: Claude ─ {label} ──────────────────────────────────────\n")
         p3 = 0
     else:
-        print("── Pass 3: Claude Haiku batch classification ─────────────────────")
+        backend = "DeepSeek" if USE_DEEPSEEK else "Claude Haiku"
+        print(f"── Pass 3: {backend} batch classification ────────────────────────")
         p3 = pass3_claude(songs)
         after3 = sum(1 for s in songs if has_genre(s))
         print(f"  Assigned: {p3}  |  have genre: {after3}  |  still missing: {len(songs) - after3}\n")
