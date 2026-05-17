@@ -4,6 +4,22 @@ import { useState, useEffect, useRef } from "react";
 import { Song } from "./Explorer";
 import { GENRE_CONFIG, FALLBACK_BAR } from "../lib/genres";
 
+declare global {
+  interface Window {
+    umami?: { track: (event: string, data?: Record<string, unknown>) => void };
+  }
+}
+
+function trackPlay(song: Song) {
+  window.umami?.track("song-play", {
+    artist: song.artist,
+    title: song.title,
+    genre: song.genre ?? undefined,
+    release_year: song.release_year ?? undefined,
+    air_year: song.air_year ?? undefined,
+  });
+}
+
 function formatAirDate(song: Song): string {
   if (song.broadcast_date) {
     return new Date(song.broadcast_date + "T00:00:00").toLocaleDateString(
@@ -87,6 +103,7 @@ export default function SongCard({
     if (isActive && song.spotify_url) {
       setAutoStarted(autoPlay);
       setShowEmbed(true);
+      trackPlay(song);
     } else if (!isActive) {
       setAutoStarted(false);
       setShowEmbed(false);
@@ -148,7 +165,10 @@ export default function SongCard({
       const next = !showEmbed;
       setAutoStarted(false); // manual click — don't autostart
       setShowEmbed(next);
-      if (next) onSetActive?.();
+      if (next) {
+        onSetActive?.();
+        trackPlay(song);
+      }
       return;
     }
 
@@ -178,6 +198,7 @@ export default function SongCard({
       setSpotifyState("found");
       setShowEmbed(true);
       onSetActive?.();
+      trackPlay(song);
     } catch {
       openSpotifySearch();
       setSpotifyState("error");
