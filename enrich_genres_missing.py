@@ -214,19 +214,25 @@ def normalize_artist(name: str) -> str:
     return re.sub(r"[^a-z0-9]", "", name.lower())
 
 
+def has_genre(s: dict) -> bool:
+    """True only for songs with a real, resolved genre (not None, empty, or 'unmatched')."""
+    g = s.get("genre")
+    return bool(g) and g != "unmatched"
+
+
 # ── Pass 1: Artist-level inference ───────────────────────────────────────────
 
 def pass1_artist_inference(songs: list) -> int:
     # Build genre frequency per normalized artist from the existing genred songs
     artist_genres: dict[str, Counter] = {}
     for s in songs:
-        if s.get("genre"):
+        if has_genre(s):
             key = normalize_artist(s["artist"])
             artist_genres.setdefault(key, Counter())[s["genre"]] += 1
 
     assigned = 0
     for s in songs:
-        if s.get("genre"):
+        if has_genre(s):
             continue
         key = normalize_artist(s["artist"])
         counts = artist_genres.get(key)
@@ -282,7 +288,7 @@ def pass2_lastfm(songs: list) -> int:
     need: list[str] = []
     seen_keys: set[str] = set()
     for s in songs:
-        if s.get("genre"):
+        if has_genre(s):
             continue
         key = s["artist"].lower().strip()
         if key not in cache and key not in seen_keys:
@@ -322,7 +328,7 @@ def pass2_lastfm(songs: list) -> int:
 
     assigned = 0
     for s in songs:
-        if s.get("genre"):
+        if has_genre(s):
             continue
         genre = cache.get(s["artist"].lower().strip())
         if genre:
@@ -382,7 +388,7 @@ def _claude_batch(batch: list[dict]) -> list[str | None]:
 
 
 def pass3_claude(songs: list) -> int:
-    ungenred = [s for s in songs if not s.get("genre")]
+    ungenred = [s for s in songs if not has_genre(s)]
     total = len(ungenred)
     print(f"  Claude: {total} songs  →  {(total + CLAUDE_BATCH - 1) // CLAUDE_BATCH} batches")
 
@@ -420,7 +426,7 @@ def main():
     with open(SONGS_PATH) as f:
         songs = json.load(f)
 
-    before = sum(1 for s in songs if s.get("genre"))
+    before = sum(1 for s in songs if has_genre(s))
     missing_before = len(songs) - before
     print(f"Songs total: {len(songs)}  |  with genre: {before}  |  missing: {missing_before}\n")
 
@@ -432,7 +438,7 @@ def main():
     # ── Pass 1 ──────────────────────────────────────────────────────────────
     print("── Pass 1: Artist inference ──────────────────────────────────────")
     p1 = pass1_artist_inference(songs)
-    after1 = sum(1 for s in songs if s.get("genre"))
+    after1 = sum(1 for s in songs if has_genre(s))
     print(f"  Assigned: {p1}  |  have genre: {after1}  |  still missing: {len(songs) - after1}\n")
 
     # ── Pass 2 ──────────────────────────────────────────────────────────────
@@ -442,7 +448,7 @@ def main():
     else:
         print("── Pass 2: Last.fm artist.getTopTags ─────────────────────────────")
         p2 = pass2_lastfm(songs)
-        after2 = sum(1 for s in songs if s.get("genre"))
+        after2 = sum(1 for s in songs if has_genre(s))
         print(f"  Assigned: {p2}  |  have genre: {after2}  |  still missing: {len(songs) - after2}\n")
 
     # ── Pass 3 ──────────────────────────────────────────────────────────────
@@ -453,11 +459,11 @@ def main():
     else:
         print("── Pass 3: Claude Haiku batch classification ─────────────────────")
         p3 = pass3_claude(songs)
-        after3 = sum(1 for s in songs if s.get("genre"))
+        after3 = sum(1 for s in songs if has_genre(s))
         print(f"  Assigned: {p3}  |  have genre: {after3}  |  still missing: {len(songs) - after3}\n")
 
     # ── Summary ─────────────────────────────────────────────────────────────
-    after = sum(1 for s in songs if s.get("genre"))
+    after = sum(1 for s in songs if has_genre(s))
     print("── Summary ───────────────────────────────────────────────────────")
     print(f"  Pass 1 (artist inference) : {p1:5d}")
     print(f"  Pass 2 (Last.fm)          : {p2:5d}")
