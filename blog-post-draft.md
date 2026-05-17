@@ -14,7 +14,7 @@ I was hooked. And I wasn't alone — this "fill-in" radio show gathered somethin
 
 And then this year, after 21 years of glorious madness, they wrapped up.
 
-What they left behind was a gap in my holidays, a gap on the airwaves and, after a bit of digging, **[INSERT: X archive pages]** on the RNZ website listing every single song they played across two decades.
+What they left behind was a gap in my holidays, a gap on the airwaves and, after a bit of digging, a complete archive on the RNZ website listing every single song they played across two decades.
 
 I was intrigued. I wanted to go back and relisten to some of those gems. I wanted to know what the most popular song they ever played was, or their most-featured artist, or their favourite genre or decade. I wanted to relive some of the cover versions they would often end each show with.
 
@@ -26,21 +26,13 @@ So, in the spirit of my other *high effort, low value* projects, I decided to do
 
 First, I scraped the RNZ archive and pulled out all the songs. And then I tried to make sense of what I had.
 
-With 18 years of shows in the archive, the data was all over the place. Band names had misspellings and inconsistencies — because when a human being types tens of thousands of entries over two decades, things drift. I found 140 distinct inconsistencies in artist names alone. Dr Hook vs Dr. Hook. Devo vs DEVO. Half Man Half Biscuit vs Half Man, Half Biscuit. The Shangri-Las vs The Shangri-las. And my personal favourite: Billy Bragg appearing as "BIlly Bragg" — capital I where it shouldn't be — which must have been an autocorrect that snuck through and persisted for years.
+With 21 years of shows in the archive, the data was all over the place. Band names had misspellings and inconsistencies — because when a human being types tens of thousands of entries over two decades, things drift. I found 140 distinct inconsistencies in artist names alone. Dr Hook vs Dr. Hook. Devo vs DEVO. Half Man Half Biscuit vs Half Man, Half Biscuit. The Shangri-Las vs The Shangri-las. And my personal favourite: Billy Bragg appearing as "BIlly Bragg" — capital I where it shouldn't be — which must have been an autocorrect that snuck through and persisted for years.
 
 Beyond the naming chaos, the data was sparse. There was no information about when songs were released, what genre they were, how popular the artist was, or really anything beyond the artist name, the song title, and the date it aired.
 
-I spent months trying to fill in those gaps. I used the Spotify API, Last.fm, MusicBrainz, and Discogs to enrich the dataset with release years, genres, and popularity metrics. I hit a wall. After a massive amount of effort, I could only get about 75% of the songs sorted. The remaining quarter — roughly 3,700 songs — simply couldn't be matched to anything in any database.
+I spent months trying to fill in those gaps. I used the Spotify API, Last.fm, MusicBrainz, and Discogs to enrich the dataset with release years, genres, and popularity metrics. I made real progress — but a long tail of songs simply couldn't be matched to anything in any database. The remaining gaps I eventually closed using an AI classification pass, working through each unresolved song by artist name and title alone and assigning it to the nearest genre from a canonical list.
 
-I hit a wall and just... left it.
-
----
-
-## Step Two: Coming Back to It
-
-But, in the last few months, I decided to pick it back up. With better tools, more patience, and a lot of help from Claude, I pushed through the enrichment pipeline, normalised the genre tags, and finally had something I could actually analyse.
-
-The result: **15,411 songs**, **6,122 unique artists**, and 18 years of one of the best radio programmes New Zealand ever produced, captured in a database.
+The result: **15,411 songs**, **5,722 unique artists**, and 21 years of one of the best radio programmes New Zealand ever produced, captured in a single dataset.
 
 Here's what the numbers say.
 
@@ -63,7 +55,7 @@ And split across two titles: *Cousin Mosquito* and *Cousin Mosquito #1*.
 
 A naive count treats each variant as a separate artist. Grouped correctly: 16 plays. The most loved song in the entire archive, and it was hiding in plain sight behind four slightly different spellings of the same name.
 
-In second place: *Snake Farm* by Ray Wylie Hubbard with a clean 12 plays. In third: *This Pullover* by Jess Conrad with 11. If you don't know either of those songs, go find them immediately. I'll wait.
+In second place: *Snake Farm* by Ray Wylie Hubbard with a clean 12 plays. Third is a tie — *My World* by Cupid's Inspiration and *This Pullover* by Jess Conrad, both with 11. If you don't know any of those songs, go find them immediately. I'll wait.
 
 ---
 
@@ -73,20 +65,20 @@ The most-featured artists across the full archive:
 
 | Rank | Artist | Plays |
 |------|--------|-------|
-| 1 | The Beach Boys | 84 |
-| 2 | The Beatles | 78 |
-| 3 | Sparks | 69 |
-| 4 | The Kinks | 68 |
-| 4 | The Rolling Stones | 68 |
-| 4 | Harry Nilsson | 68 |
-| 7 | The Divine Comedy | 65 |
-| 8 | Half Man Half Biscuit | 64 |
-| 9 | The Move | 57 |
-| 10 | Devo | 56 |
+| 1 | The Beach Boys | 85 |
+| 2 | The Beatles | 79 |
+| 3= | Harry Nilsson | 69 |
+| 3= | Sparks | 69 |
+| 5 | The Kinks | 68 |
+| 6 | The Rolling Stones | 67 |
+| 7 | Half Man Half Biscuit | 65 |
+| 8 | The Divine Comedy | 64 |
+| 9 | Devo | 57 |
+| 10 | Burton Cummings | 55 |
 
-The Beach Boys edging out The Beatles by six plays feels about right for this show. But Sparks at number three — ahead of the Stones — is quintessential Matinee Idle. And the presence of Half Man Half Biscuit and The Move in the top ten tells you everything about the show's sensibility.
+The Beach Boys edging out The Beatles by six plays feels about right for this show. But Sparks and Harry Nilsson tied at third — ahead of the Stones — is quintessential Matinee Idle. And the presence of Half Man Half Biscuit and Burton Cummings in the top ten tells you everything about the show's sensibility.
 
-What's equally striking is what's *underneath* that top ten. Of the 6,122 unique artists in the dataset, **4,083 of them — 66% — appeared exactly once**. One song. One slot. One chance to be heard. The whole ethos of the show in a single statistic.
+What's equally striking is what's *underneath* that top ten. Of the 5,722 unique artists in the dataset, **3,620 of them — 63% — appeared exactly once**. One song. One slot. One chance to be heard. The whole ethos of the show in a single statistic.
 
 ---
 
@@ -94,44 +86,47 @@ What's equally striking is what's *underneath* that top ten. Of the 6,122 unique
 
 The show was famous for playing *old* stuff. Not just "this 90s classic" old — genuinely old. The data bears this out.
 
-The oldest song in the dataset was recorded in **1937**: *Onyx Hop* by Frankie Newton and His Uptown Serenaders, aired 82 years after it was recorded.
+The oldest song in the dataset is from **1930**: *Puttin' on the Ritz* by Fred Astaire, which aired 91 years after it was recorded. Close behind: Leola Manning's *Satan's Is Busy in Knoxville* (also 1930) and a 1931 recording of *Dream a Little Dream of Me* by Ozzie Nelson — the original, decades before Mama Cass made it famous.
 
-Close behind: the Light Crust Doughboys' 1938 recording of a song called *Pussy, Pussy, Pussy*, which aired in 2022 — an 84-year gap between recording and broadcast. I cannot tell you whether Phil or Simon played that one, but I would bet money on there being a story attached.
-
-The release decade breakdown tells its own story:
+The decade breakdown tells its own story:
 
 | Decade | Share of songs |
 |--------|---------------|
-| 2000s | 30.4% |
-| 1990s | 23.7% |
-| 2010s | 22.2% |
-| 1980s | 8.0% |
-| 2020s | 7.0% |
-| Pre-1950 | 0.4% |
+| 1970s | 15.5% |
+| 2000s | 14.5% |
+| 1960s | 14.4% |
+| 1990s | 12.0% |
+| 1980s | 11.9% |
+| 2010s | 9.9% |
+| 1950s | 2.9% |
+| 2020s | 1.7% |
+| Pre-1950 | 0.6% |
 
-The 2000s dominating makes sense — it was when the show launched and the hosts were in their prime music-collecting years. But the 1990s and 2010s holding their own suggests the show kept refreshing, not just recycling.
-
----
-
-## The Genres: More Rock, More Soul, More Weird
-
-When we could pin down a genre (about 75% of the dataset), the landscape looked like this:
-
-**Rock** (2,314), **Pop** (1,668), **Classic Rock** (1,637), **Soul** (1,131), **Folk** (1,008), **Country** (976), **Jazz** (879), **New Wave** (812)...
-
-And then, further down the list: **Comedy** (650 songs). That's not a side note — 650 songs where the joke is at least partly the point. That's a cornerstone of what the show was.
-
-Alongside that: Rockabilly (367), Electronic (308), and a scattering of genres that don't really have a name because only a handful of people in the world would claim to be fans.
+What strikes me most is how flat this distribution is. The 1960s, 1970s, and 2000s are all within a percentage point of each other. This wasn't a show that got stuck in one era — it ranged across the full century of recorded music with roughly equal enthusiasm for all of it. The 1950s and pre-war recordings are the tail, but even there, 444 songs from the 1950s is not a footnote.
 
 ---
 
-## The 24% We Couldn't Match
+## The Genres
 
-Here's where the data gets honest.
+With 100% genre coverage across all 15,411 songs — achieved through a combination of Spotify, Last.fm, MusicBrainz, Discogs, and a final AI classification pass for the songs that defeated every database — the full picture looks like this:
 
-Almost a quarter of all songs in the archive — 3,740 of them — couldn't be fully matched to any music database. No complete Spotify record. No clean MusicBrainz entry. They exist in the RNZ archive, in my dataset, and that's mostly it.
+**Rock** (2,227), **Pop** (1,680), **Classic Rock** (1,650), **Soul** (1,106), **Folk** (1,004), **Country** (998), **Jazz** (890), **New Wave** (786)...
 
-Some of these are collaboration entries that databases don't handle well. Some are cover versions by artists so obscure that even Discogs doesn't know they exist. Some are one-off novelty recordings or live rarities.
+And then, further down the list: **Comedy** (734 songs). That's not a side note — 734 songs where the joke is at least partly the point. That's a cornerstone of what the show was.
+
+Alongside that: Blues (588), Indie (623), Progressive Rock (519), Rockabilly (378). And at the bottom end, 55 songs classified as Classical — which feels low until you remember this was a pop music show, and even getting to 55 means someone was deliberately reaching.
+
+The genre that probably surprises people most is Comedy at nearly 5% of the entire archive. That's not novelty songs sneaking in — that's a deliberate editorial commitment to songs that make you laugh. It's one of the things that made the show impossible to replicate.
+
+---
+
+## The Songs Databases Don't Know
+
+Here's where the data gets interesting in a different way.
+
+Some of these songs exist in the RNZ archive and more or less nowhere else. No Spotify record. No clean MusicBrainz entry. No Discogs listing. They were played on a summer afternoon radio show in New Zealand, and that's the full extent of their documented existence.
+
+Some of these are collaboration entries that databases don't handle well. Some are cover versions by artists so obscure that even specialist databases don't know they exist. Some are one-off novelty recordings or live rarities.
 
 And then there are the cases that tell you exactly what kind of show this was.
 
@@ -145,20 +140,16 @@ And then, buried in the list: **Simon Morris — Walking in Guildford**. And *Si
 
 Simon Morris, one of the two hosts, apparently played his own songs on his own show. Multiple times. These recordings are essentially invisible to any music database because he is not a catalogued recording artist in any formal sense. He just played his own stuff. On radio. That he co-hosted. I find this completely delightful.
 
-Those 3,740 unmatched songs might be the most Matinee Idle data point of all. If you could easily find a song in a database, it was probably too easy for Phil and Simon to have bothered with.
+These are, in a sense, the most Matinee Idle songs in the entire archive. If you could easily find a song in a database, it was probably too easy for Phil and Simon to have bothered with.
 
 ---
 
 ## What's Next
 
-The data is clean, the database is running, and I've built an explorer so you can dig through all of it yourself. Search by artist, year, genre, or decade — or filter specifically by "unmatched" to browse the songs that defeated every automated tool I threw at them.
+The data is clean, the genre is assigned for every single song, and I've built an explorer so you can dig through all of it yourself. Search by artist, year, genre, or decade — or just hit the random button and see what comes up.
 
 If you were a Matinee Idle listener, I hope this brings back some memories. If you weren't — well, now you have 15,411 songs to work through. Start with Cousin Mosquito.
 
 ---
 
 *The Matinee Idle archive explorer is at radomski.co.nz. More soon.*
-
----
-
-> **Note before publishing:** Fill in the RNZ archive page count — the scraper pulled from a database backup so the raw page count isn't stored in the code. Check the RNZ archive directly and drop the number into the first section.
