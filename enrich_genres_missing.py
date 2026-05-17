@@ -366,7 +366,7 @@ def _claude_batch(batch: list[dict]) -> list[str | None]:
 
     if USE_DEEPSEEK:
         payload = json.dumps({
-            "model": "deepseek-chat",
+            "model": "deepseek-v4-flash",
             "max_tokens": 512,
             "messages": [
                 {"role": "system", "content": _SYSTEM},
