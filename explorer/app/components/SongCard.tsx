@@ -11,13 +11,14 @@ declare global {
 }
 
 function trackPlay(song: Song) {
-  window.umami?.track("song-play", {
+  const props: Record<string, string> = {
     artist: song.artist,
     title: song.title,
-    genre: song.genre ?? undefined,
-    release_year: song.release_year ?? undefined,
-    air_year: song.air_year ?? undefined,
-  });
+  };
+  if (song.genre) props.genre = song.genre;
+  if (song.release_year) props.release_year = String(song.release_year);
+  if (song.air_year) props.air_year = String(song.air_year);
+  window.umami?.track("song-play", props);
 }
 
 function formatAirDate(song: Song): string {
