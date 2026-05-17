@@ -1,2 +1,22 @@
 __pycache__/
 *.pyc
+
+# Enrichment cache files (large, not needed to run the app)
+spotify_cache.json
+discogs_year_cache.json
+lastfm_genre_cache.json
+lastfm_missing_cache.json
+mb_first_release_cache.json
+mb_genre_cache.json
+spotify_artist_genre_cache.json
+lastfm_missing_cache.json
+spotify_quota_reset.txt
+
+# Stale/redundant data copies
+songs.json
+songs_enriched.json
+explorer/public/songs.json.bak
+
+# Database backups
+*.backup.gz
+*.backup
