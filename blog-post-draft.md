@@ -134,7 +134,7 @@ And then there are the cases that tell you exactly what kind of show this was.
 
 *William Shatner & Joe Jackson — Common People*. This is real. It exists. William Shatner did a spoken word cover of the Pulp classic with Joe Jackson playing alongside him. It is exactly as strange as it sounds, and of course Matinee Idle played it.
 
-*Coby Smulders & Nicole Scherzinger — Two Beavers Are Better Than One*. From a Canadian children's show. No database has it. Of course it was played.
+*Coby Smulders & Nicole Scherzinger — Two Beavers Are Better Than One*. Technically from *How I Met Your Mother* — specifically, from a fictional Canadian children's show that the writers invented as a running joke. A song that exists because a US sitcom made up a fake TV show. No database has it categorised. Of course it was played.
 
 And then, buried in the list: **Simon Morris — Walking in Guildford**. And *Simon Morris — Boom Boom*. And *Simon Morris — The Hobbit*. And several more.
 
