@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Matinee Idle Explorer
 
-## Getting Started
+Next.js web app for browsing the Matinee Idle song archive. Deployed at [radomski.co.nz](https://radomski.co.nz).
 
-First, run the development server:
+## Local development
 
 ```bash
+cp .env.local.example .env.local
+# Add your Spotify API credentials (https://developer.spotify.com/dashboard)
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Description |
+|----------|-------------|
+| `SPOTIFY_CLIENT_ID` | Spotify app client ID (for on-demand track lookup) |
+| `SPOTIFY_CLIENT_SECRET` | Spotify app client secret |
 
-## Learn More
+## Data
 
-To learn more about Next.js, take a look at the following resources:
+The dataset lives at `public/songs.json` — a static JSON file of 15,411 enriched songs. No database is required at runtime. The file is committed to the repo and served as a static asset.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Next.js 16** (App Router)
+- **Tailwind CSS**
+- **Recharts** (Stats view)
+- **Vercel** (deployment)

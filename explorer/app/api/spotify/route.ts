@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
-const CLIENT_ID = "f3bcd797aeaa4a50bcb6132366835d64";
-const CLIENT_SECRET = "30e26fd9d30844d08b94dced12fe380d";
+const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID ?? "";
+const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET ?? "";
 
 let token = "";
 let tokenExpiry = 0;
