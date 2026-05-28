@@ -309,6 +309,17 @@ export default function Explorer() {
     if (allIdx >= 0) setPage(Math.floor(allIdx / PAGE_SIZE) + 1);
   }, [filtered]);
 
+  const handleCoversNext = useCallback((currentId: string) => {
+    const flat = coversView.flatMap((g) => g.versions).filter((s) => s.spotify_url);
+    if (flat.length <= 1) return;
+    const idx = flat.findIndex((s) => s.id === currentId);
+    const next = flat[idx === -1 ? 0 : (idx + 1) % flat.length];
+    setActivePlayId(next.id);
+    // Ensure the group containing the next song is expanded
+    const group = coversView.find((g) => g.versions.some((s) => s.id === next.id));
+    if (group) setExpandedCovers((prev) => new Set([...prev, group.title]));
+  }, [coversView]);
+
   const pickRandom = useCallback(() => {
     const pool = filtered.length > 0 ? filtered : songs;
     setRandomSong(pool[Math.floor(Math.random() * pool.length)]);
@@ -563,6 +574,7 @@ export default function Explorer() {
                               onSpotifyResult={handleSpotifyResult}
                               isActive={activePlayId === s.id}
                               onSetActive={() => setActivePlayId(s.id)}
+                              onNext={() => handleCoversNext(s.id)}
                               autoPlay={autoPlay}
                               onAutoPlayToggle={() => setAutoPlay(v => !v)}
                             />
