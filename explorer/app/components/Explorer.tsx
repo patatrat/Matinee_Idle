@@ -349,6 +349,14 @@ export default function Explorer() {
               <p className="mt-1 text-[11px] text-neutral-500 tracking-widest uppercase">
                 Radio New Zealand · Phil O&apos;Brien &amp; Simon Morris · 2005–2026
               </p>
+              <a
+                href="https://radomski.co.nz/blog/matinee-idle"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1.5 inline-block text-[11px] text-amber-500/70 hover:text-amber-400 transition-colors"
+              >
+                What&apos;s this all about then? →
+              </a>
             </div>
             {!loading && (
               <div className="hidden sm:flex items-center gap-2 shrink-0">
