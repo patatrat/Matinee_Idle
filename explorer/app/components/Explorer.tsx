@@ -242,6 +242,45 @@ export default function Explorer() {
   const totalPages = Math.max(1, Math.ceil(deduped.length / PAGE_SIZE));
   const paginated = deduped.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  // ── Analytics ────────────────────────────────────────────────────────────────
+
+  // Arrival: fire once on load — referrer hostname + any UTM params in the URL
+  useEffect(() => {
+    const ref = document.referrer;
+    const params = new URLSearchParams(window.location.search);
+    const props: Record<string, string> = {};
+    if (params.get("utm_source"))   props.utm_source   = params.get("utm_source")!;
+    if (params.get("utm_medium"))   props.utm_medium   = params.get("utm_medium")!;
+    if (params.get("utm_campaign")) props.utm_campaign = params.get("utm_campaign")!;
+    if (ref) {
+      try { props.referrer = new URL(ref).hostname; } catch { props.referrer = ref; }
+      if (ref.includes("facebook.com"))                     props.source = "facebook";
+      else if (ref.includes("reddit.com"))                  props.source = "reddit";
+      else if (ref.includes("twitter.com") || ref.includes("x.com")) props.source = "twitter";
+      else if (ref.includes("instagram.com"))               props.source = "instagram";
+      else if (ref.includes("google.com"))                  props.source = "google";
+      else                                                  props.source = "referral";
+    } else {
+      props.source = params.get("utm_source") ?? "direct";
+    }
+    window.umami?.track("arrival", props);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Search: debounced 800ms, only when query has 2+ characters
+  useEffect(() => {
+    if (query.trim().length < 2) return;
+    const timer = setTimeout(() => {
+      window.umami?.track("search", {
+        query: query.trim(),
+        results: String(deduped.length),
+      });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [query, deduped.length]);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const activeFilterCount =
     (query ? 1 : 0) +
     (artistFilter ? 1 : 0) +
@@ -291,7 +330,12 @@ export default function Explorer() {
   const handleGenreToggle = useCallback((genre: string) => {
     setGenreFilters((prev) => {
       const next = new Set(prev);
-      if (next.has(genre)) next.delete(genre); else next.add(genre);
+      if (next.has(genre)) {
+        next.delete(genre);
+      } else {
+        next.add(genre);
+        window.umami?.track("filter-genre", { genre });
+      }
       return next;
     });
     setPage(1);
