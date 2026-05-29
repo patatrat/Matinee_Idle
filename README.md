@@ -2,7 +2,8 @@
 
 An interactive data explorer for 21 years of Radio New Zealand's legendary summer music show (2005–2026), hosted by Phil O'Brien and Simon Morris.
 
-**Live site:** [radomski.co.nz](https://radomski.co.nz)
+**Live site:**[Matinee Idle](https://matineeidle.radomski.co.nz/)
+**Blog post** [radomski.co.nz](https://radomski.co.nz/blog/matinee-idle/)
 
 ---
 
