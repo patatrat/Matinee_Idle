@@ -227,8 +227,20 @@ export default function Explorer() {
       .map(([key, count]) => ({ artist: canonicalArtist[key] ?? key, count }));
   }, [filtered, canonicalArtist]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Deduplicate by normalised artist+title so capitalisation variants
+  // (e.g. "Singing a Song is Easy" vs "Singing a Song Is Easy") appear once.
+  const deduped = useMemo(() => {
+    const seen = new Set<string>();
+    return filtered.filter(s => {
+      const key = `${normalize(s.artist)}|||${normalize(s.title)}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [filtered]);
+
+  const totalPages = Math.max(1, Math.ceil(deduped.length / PAGE_SIZE));
+  const paginated = deduped.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const activeFilterCount =
     (query ? 1 : 0) +
@@ -300,14 +312,14 @@ export default function Explorer() {
   }, []);
 
   const handleNext = useCallback((currentId: string) => {
-    const withLinks = filtered.filter((s) => s.spotify_url);
+    const withLinks = deduped.filter((s) => s.spotify_url);
     if (withLinks.length <= 1) return;
     const idx = withLinks.findIndex((s) => s.id === currentId);
     const next = withLinks[idx === -1 ? 0 : (idx + 1) % withLinks.length];
     setActivePlayId(next.id);
-    const allIdx = filtered.findIndex((s) => s.id === next.id);
+    const allIdx = deduped.findIndex((s) => s.id === next.id);
     if (allIdx >= 0) setPage(Math.floor(allIdx / PAGE_SIZE) + 1);
-  }, [filtered]);
+  }, [deduped]);
 
   const handleCoversNext = useCallback((currentId: string) => {
     const flat = coversView.flatMap((g) => g.versions).filter((s) => s.spotify_url);
