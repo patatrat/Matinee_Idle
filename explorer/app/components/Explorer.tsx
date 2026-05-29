@@ -114,7 +114,7 @@ export default function Explorer() {
   const songPlayCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const s of songs) {
-      const key = `${s.artist}|||${s.title}`;
+      const key = `${normalize(s.artist)}|||${normalize(s.title)}`;
       counts[key] = (counts[key] ?? 0) + 1;
     }
     return counts;
@@ -167,8 +167,8 @@ export default function Explorer() {
     } else if (sortBy === "times-played") {
       result = [...result].sort(
         (a, b) =>
-          (songPlayCounts[`${b.artist}|||${b.title}`] ?? 1) -
-          (songPlayCounts[`${a.artist}|||${a.title}`] ?? 1)
+          (songPlayCounts[`${normalize(b.artist)}|||${normalize(b.title)}`] ?? 1) -
+          (songPlayCounts[`${normalize(a.artist)}|||${normalize(a.title)}`] ?? 1)
       );
     } else if (sortBy === "date-released") {
       result = [...result].sort((a, b) => (a.release_year ?? 9999) - (b.release_year ?? 9999));
@@ -567,7 +567,7 @@ export default function Explorer() {
                               key={s.id}
                               song={s}
                               artistCount={artistCounts[normalize(s.artist)] ?? 1}
-                              playCount={songPlayCounts[`${s.artist}|||${s.title}`] ?? 1}
+                              playCount={songPlayCounts[`${normalize(s.artist)}|||${normalize(s.title)}`] ?? 1}
                               onArtistClick={(a) => { setView("songs"); handleArtistClick(a); }}
                               onGenreClick={handleGenreClick}
                               onReleaseYearClick={handleReleaseYearClick}
@@ -624,7 +624,7 @@ export default function Explorer() {
                     key={song.id}
                     song={song}
                     artistCount={artistCounts[normalize(song.artist)] ?? 1}
-                    playCount={songPlayCounts[`${song.artist}|||${song.title}`] ?? 1}
+                    playCount={songPlayCounts[`${normalize(song.artist)}|||${normalize(song.title)}`] ?? 1}
                     onArtistClick={handleArtistClick}
                     onGenreClick={handleGenreClick}
                     onReleaseYearClick={handleReleaseYearClick}
