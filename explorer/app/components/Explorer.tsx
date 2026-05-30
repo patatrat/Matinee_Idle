@@ -43,6 +43,16 @@ function normalize(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+// Normalise collaboration connectors before deduplication so that
+// "X feat. Y", "X ft. Y", "X & Y", "X and Y" all collapse to the same key.
+function normalizeArtistKey(name: string): string {
+  return normalize(
+    name
+      .replace(/\b(feat\.?|ft\.?|featuring|with)\s+/gi, " ")
+      .replace(/\s+(&|and|\+)\s+/gi, " ")
+  );
+}
+
 function Pill({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 px-3 py-1 text-xs text-white">
@@ -114,7 +124,7 @@ export default function Explorer() {
   const songPlayCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const s of songs) {
-      const key = `${normalize(s.artist)}|||${normalize(s.title)}`;
+      const key = `${normalizeArtistKey(s.artist)}|||${normalize(s.title)}`;
       counts[key] = (counts[key] ?? 0) + 1;
     }
     return counts;
@@ -228,11 +238,11 @@ export default function Explorer() {
   }, [filtered, canonicalArtist]);
 
   // Deduplicate by normalised artist+title so capitalisation variants
-  // (e.g. "Singing a Song is Easy" vs "Singing a Song Is Easy") appear once.
+  // and collaboration-connector variants appear once.
   const deduped = useMemo(() => {
     const seen = new Set<string>();
     return filtered.filter(s => {
-      const key = `${normalize(s.artist)}|||${normalize(s.title)}`;
+      const key = `${normalizeArtistKey(s.artist)}|||${normalize(s.title)}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -623,7 +633,7 @@ export default function Explorer() {
                               key={s.id}
                               song={s}
                               artistCount={artistCounts[normalize(s.artist)] ?? 1}
-                              playCount={songPlayCounts[`${normalize(s.artist)}|||${normalize(s.title)}`] ?? 1}
+                              playCount={songPlayCounts[`${normalizeArtistKey(s.artist)}|||${normalize(s.title)}`] ?? 1}
                               onArtistClick={(a) => { setView("songs"); handleArtistClick(a); }}
                               onGenreClick={handleGenreClick}
                               onReleaseYearClick={handleReleaseYearClick}
