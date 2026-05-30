@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import Script from "next/script";
+import WebVitals from "./components/WebVitals";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${geist.variable} h-full`}>
       <body className="min-h-full bg-neutral-950 text-neutral-100 font-sans antialiased">
         {children}
+        <WebVitals />
         <Script
           src="https://analytics.radomski.co.nz/script.js"
           data-website-id="65225d81-5bcd-43f3-8f8c-f72ad5c48d50"
