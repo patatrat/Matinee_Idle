@@ -1,6 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
+
+declare global {
+  interface Window {
+    umami?: { track: (event: string, data?: Record<string, unknown>) => void };
+  }
+}
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
@@ -188,7 +194,7 @@ export default function StatsView({ songs, onGenreClick, onArtistClick, onYearCl
               <YAxis tick={TICK} {...AXIS_PROPS} width={40} />
               <Tooltip {...TOOLTIP_PROPS} />
               <Bar dataKey="count" name="plays" fill="#f59e0b" radius={[2, 2, 0, 0]}
-                cursor="pointer" onClick={(d) => onYearClick((d as unknown as { year: string }).year)} />
+                cursor="pointer" onClick={(d) => { const year = (d as unknown as { year: string }).year; window.umami?.track("chart-interaction", { chart: "songs-per-year", value: year }); onYearClick(year); }} />
             </BarChart>
           </ResponsiveContainer>
         </ChartSection>
@@ -201,7 +207,7 @@ export default function StatsView({ songs, onGenreClick, onArtistClick, onYearCl
               <YAxis tick={TICK} {...AXIS_PROPS} width={40} />
               <Tooltip {...TOOLTIP_PROPS} />
               <Bar dataKey="count" name="songs" fill="#a3a3a3" radius={[2, 2, 0, 0]}
-                cursor="pointer" onClick={(d) => onDecadeClick((d as unknown as { lo: number }).lo)} />
+                cursor="pointer" onClick={(d) => { const lo = (d as unknown as { lo: number }).lo; window.umami?.track("chart-interaction", { chart: "release-decade", value: String(lo) }); onDecadeClick(lo); }} />
             </BarChart>
           </ResponsiveContainer>
         </ChartSection>
@@ -233,7 +239,7 @@ export default function StatsView({ songs, onGenreClick, onArtistClick, onYearCl
               />
               <Tooltip {...TOOLTIP_PROPS} />
               <Bar dataKey="count" name="songs" radius={[0, 2, 2, 0]}
-                cursor="pointer" onClick={(d) => onGenreClick((d as unknown as { genre: string }).genre)}>
+                cursor="pointer" onClick={(d) => { const genre = (d as unknown as { genre: string }).genre; window.umami?.track("chart-interaction", { chart: "genre-breakdown", value: genre }); onGenreClick(genre); }}>
                 {genreBreakdown.map(({ genre }) => (
                   <Cell key={genre} fill={GENRE_HEX[genre] ?? FALLBACK_HEX} />
                 ))}
@@ -256,7 +262,7 @@ export default function StatsView({ songs, onGenreClick, onArtistClick, onYearCl
               />
               <Tooltip {...TOOLTIP_PROPS} />
               <Bar dataKey="count" name="plays" fill="#f59e0b" radius={[0, 2, 2, 0]}
-                cursor="pointer" onClick={(d) => onArtistClick((d as unknown as { label: string }).label)} />
+                cursor="pointer" onClick={(d) => { const label = (d as unknown as { label: string }).label; window.umami?.track("chart-interaction", { chart: "top-artists", value: label }); onArtistClick(label); }} />
             </BarChart>
           </ResponsiveContainer>
         </ChartSection>
@@ -275,7 +281,7 @@ export default function StatsView({ songs, onGenreClick, onArtistClick, onYearCl
               />
               <Tooltip {...TOOLTIP_PROPS} />
               <Bar dataKey="count" name="plays" fill="#f59e0b" radius={[0, 2, 2, 0]}
-                cursor="pointer" onClick={(d) => onArtistClick((d as unknown as { rawArtist: string }).rawArtist)} />
+                cursor="pointer" onClick={(d) => { const rawArtist = (d as unknown as { rawArtist: string }).rawArtist; window.umami?.track("chart-interaction", { chart: "top-songs", value: rawArtist }); onArtistClick(rawArtist); }} />
             </BarChart>
           </ResponsiveContainer>
         </ChartSection>

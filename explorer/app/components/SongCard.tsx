@@ -180,6 +180,7 @@ export default function SongCard({
     }
 
     setSpotifyState("loading");
+    window.umami?.track("spotify-lookup", { query: `${song.artist} – ${song.title}` });
     try {
       const params = new URLSearchParams({ artist: song.artist, title: song.title });
       const resp = await fetch(`/api/spotify?${params}`);

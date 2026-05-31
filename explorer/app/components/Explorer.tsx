@@ -355,6 +355,7 @@ export default function Explorer() {
     setDecadeFilter(lo);
     setReleaseYearFilter(null);
     setPage(1);
+    if (lo !== null) window.umami?.track("filter-applied", { type: "decade", value: String(lo) });
   }, []);
 
   const handleSpotifyResult = useCallback((artist: string, title: string, url: string) => {
@@ -395,11 +396,11 @@ export default function Explorer() {
   const sidebarProps = {
     query, onQueryChange: (v: string) => { setQuery(v); setPage(1); },
     artistFilter, onArtistChange: (v: string) => { setArtistFilter(v); setPage(1); },
-    yearFilter, onYearChange: (v: string) => { setYearFilter(v); setPage(1); },
+    yearFilter, onYearChange: (v: string) => { setYearFilter(v); setPage(1); if (v !== "all") window.umami?.track("filter-applied", { type: "year", value: v }); },
     years,
     decadeFilter, onDecadeChange: handleDecadeChange,
     genreFilters, onGenreToggle: handleGenreToggle,
-    sortBy, onSortChange: (v: SortBy) => { setSortBy(v); setPage(1); },
+    sortBy, onSortChange: (v: SortBy) => { setSortBy(v); setPage(1); window.umami?.track("filter-applied", { type: "sort", value: v }); },
     onRandom: pickRandom,
     onClearAll: handleClearAll,
     activeFilterCount,
