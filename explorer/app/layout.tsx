@@ -25,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           async
           src="https://analytics.radomski.co.nz/script.js"
           data-website-id="65225d81-5bcd-43f3-8f8c-f72ad5c48d50"
+          data-performance="true"
         />
       </head>
       <body className="min-h-full bg-neutral-950 text-neutral-100 font-sans antialiased">
