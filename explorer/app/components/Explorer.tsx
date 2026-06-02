@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import SongCard from "./SongCard";
 import FilterSidebar from "./FilterSidebar";
-import StatsView from "./StatsView";
+import StatsView, { type StatsData } from "./StatsView";
 
 export interface Song {
   id: string;
@@ -83,6 +83,13 @@ export default function Explorer() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activePlayId, setActivePlayId] = useState<string | null>(null);
   const [autoPlay, setAutoPlay] = useState(false);
+  const [statsData, setStatsData] = useState<StatsData | null>(null);
+
+  // Lazy-load stats.json only when the Stats tab is first opened (4.5 KB)
+  useEffect(() => {
+    if (view !== "stats" || statsData) return;
+    fetch("/stats.json").then(r => r.json()).then(setStatsData);
+  }, [view, statsData]);
 
   useEffect(() => {
     fetch("/songs.json")
@@ -593,13 +600,19 @@ export default function Explorer() {
                 </div>
               </div>
             ) : view === "stats" ? (
-              <StatsView
-                songs={songs}
-                onGenreClick={(genre) => { setGenreFilters(new Set([genre])); setView("songs"); setPage(1); }}
-                onArtistClick={handleTopArtistClick}
-                onYearClick={(year) => { setYearFilter(year); setView("songs"); setPage(1); }}
-                onDecadeClick={(lo) => { handleDecadeChange(lo); setView("songs"); }}
-              />
+              statsData ? (
+                <StatsView
+                  stats={statsData}
+                  onGenreClick={(genre) => { setGenreFilters(new Set([genre])); setView("songs"); setPage(1); }}
+                  onArtistClick={handleTopArtistClick}
+                  onYearClick={(year) => { setYearFilter(year); setView("songs"); setPage(1); }}
+                  onDecadeClick={(lo) => { handleDecadeChange(lo); setView("songs"); }}
+                />
+              ) : (
+                <div className="flex items-center justify-center py-32 text-neutral-600">
+                  <div className="inline-block w-5 h-5 border-2 border-neutral-700 border-t-neutral-400 rounded-full animate-spin" />
+                </div>
+              )
             ) : view === "covers" ? (
               <div className="divide-y divide-neutral-900/60 px-4 sm:px-6 py-2">
                 {coversView.map(({ title, count, versions }) => {
