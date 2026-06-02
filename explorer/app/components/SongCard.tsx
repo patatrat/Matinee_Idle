@@ -83,6 +83,9 @@ export default function SongCard({
   const [showEmbed, setShowEmbed] = useState(false);
   const [autoStarted, setAutoStarted] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  // Prevents double-firing: manual click tracks play then sets this true so
+  // the isActive effect (which fires immediately after) knows to skip.
+  const didTrackRef = useRef(false);
 
   useEffect(() => {
     if (song.spotify_url) return;
@@ -104,7 +107,9 @@ export default function SongCard({
     if (isActive && song.spotify_url) {
       setAutoStarted(autoPlay);
       setShowEmbed(true);
-      trackPlay(song);
+      // Only track if the manual click path didn't already do it
+      if (!didTrackRef.current) trackPlay(song);
+      didTrackRef.current = false;
     } else if (!isActive) {
       setAutoStarted(false);
       setShowEmbed(false);
@@ -150,7 +155,7 @@ export default function SongCard({
     // completes and falls back to 30s preview even for Premium users.
     // 1500ms is enough for the embed JS to load and complete auth on most connections.
     setTimeout(() => {
-      iframeRef.current?.contentWindow?.postMessage({ command: "play" }, "*");
+      iframeRef.current?.contentWindow?.postMessage({ command: "play" }, "https://open.spotify.com");
     }, 1500);
   }
 
@@ -167,8 +172,9 @@ export default function SongCard({
       setAutoStarted(false); // manual click — don't autostart
       setShowEmbed(next);
       if (next) {
-        onSetActive?.();
+        didTrackRef.current = true;
         trackPlay(song);
+        onSetActive?.();
       }
       return;
     }
@@ -199,8 +205,9 @@ export default function SongCard({
       onSpotifyResult(song.artist, song.title, url);
       setSpotifyState("found");
       setShowEmbed(true);
-      onSetActive?.();
+      didTrackRef.current = true;
       trackPlay(song);
+      onSetActive?.();
     } catch {
       openSpotifySearch();
       setSpotifyState("error");
