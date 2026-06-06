@@ -314,10 +314,11 @@ export default function Explorer() {
 
   // Deduplicate by normalised artist+title so capitalisation variants
   // and collaboration-connector variants appear once.
+  // normalizeArtistKey used for title too so "Bonnie and Clyde" / "Bonnie & Clyde" collapse.
   const deduped = useMemo(() => {
     const seen = new Set<string>();
     return filtered.filter(s => {
-      const key = `${normalizeArtistKey(s.artist)}|||${normalize(s.title)}`;
+      const key = `${normalizeArtistKey(s.artist)}|||${normalizeArtistKey(s.title)}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

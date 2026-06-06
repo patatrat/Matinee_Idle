@@ -10,6 +10,20 @@ declare global {
   }
 }
 
+// Split a credited artist into individual names for separate clickable links.
+// Returns the original single-item array when no collaboration markers are found.
+function splitArtistParts(name: string): string[] {
+  const cleaned = name.replace(/\s*\([^)]*\)/g, "").trim();
+  let parts = cleaned.split(/\s*(?:feat\.?|ft\.?|featuring)\s*/i);
+  parts = parts.flatMap(p => p.split(/\s+with\s+/i));
+  parts = parts.flatMap(p => p.split(/\s*&\s*/));
+  parts = parts.flatMap(p =>
+    p.split(/\s+and\s+(?!(?:the|a|an|his|her|their|de|le|la|los|el|all|friends|more|others)\b)/i)
+  );
+  const result = parts.map(p => p.trim()).filter(p => p.length >= 4 && /[a-zA-Z]/.test(p));
+  return result.length > 1 ? result : [name];
+}
+
 function trackPlay(song: Song) {
   const props: Record<string, string> = {
     artist: song.artist,
@@ -242,14 +256,19 @@ export default function SongCard({
 
       {/* Main content */}
       <div className="flex-1 min-w-0">
-        {/* Row 1: Artist + count badge */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <button
-            onClick={() => onArtistClick(song.artist)}
-            className="text-sm font-semibold text-neutral-400 hover:text-neutral-200 hover:underline transition-colors text-left leading-snug"
-          >
-            {song.artist}
-          </button>
+        {/* Row 1: Artist(s) + count badge — collaborations split into individual links */}
+        <div className="flex items-center gap-1 flex-wrap">
+          {splitArtistParts(song.artist).map((part, i) => (
+            <span key={i} className="flex items-center gap-1">
+              {i > 0 && <span className="text-neutral-700 select-none">·</span>}
+              <button
+                onClick={() => onArtistClick(part)}
+                className="text-sm font-semibold text-neutral-400 hover:text-neutral-200 hover:underline transition-colors text-left leading-snug"
+              >
+                {part}
+              </button>
+            </span>
+          ))}
           <Count n={artistCount} title={`${artistCount} songs by this artist`} />
         </div>
 
