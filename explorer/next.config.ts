@@ -43,7 +43,7 @@ const nextConfig: NextConfig = {
       {
         source: "/songs.json",
         headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+          { key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=3600" },
         ],
       },
     ];
