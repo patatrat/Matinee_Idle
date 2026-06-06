@@ -53,6 +53,23 @@ function normalizeArtistKey(name: string): string {
   );
 }
 
+// Split a credited artist string into individual names.
+// "Serge Gainsbourg and Brigitte Bardot" → ["Serge Gainsbourg", "Brigitte Bardot"]
+// "Kid Creole and the Coconuts"          → ["Kid Creole and the Coconuts"] (band name, 'the' guard)
+// Strips parenthetical notes first.
+function extractCollabParts(name: string): string[] {
+  const cleaned = name.replace(/\s*\([^)]*\)/g, "").trim();
+  let parts = cleaned.split(/\s*(?:feat\.?|ft\.?|featuring)\s*/i);
+  parts = parts.flatMap(p => p.split(/\s+with\s+/i));
+  parts = parts.flatMap(p => p.split(/\s*&\s*/));
+  parts = parts.flatMap(p =>
+    p.split(/\s+and\s+(?!(?:the|a|an|his|her|their|de|le|la|los|el|all|friends|more|others)\b)/i)
+  );
+  return parts.map(p => p.trim()).filter(p => p.length >= 4 && /[a-zA-Z]/.test(p));
+}
+
+const ARTICLE_PREFIX = /^(?:the|a|an|his|her|their)\s/i;
+
 function Pill({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 px-3 py-1 text-xs text-white">
@@ -146,6 +163,47 @@ export default function Explorer() {
       .map(([key, count]) => ({ artist: canonicalArtist[key] ?? key, count }));
   }, [artistCounts, canonicalArtist]);
 
+  // Pre-compute which extracted individual artist names are "real" (not just backing bands).
+  // Rules:
+  //   Primary (first-listed) artists are always real.
+  //   Secondary artists qualify if:
+  //     (a) they appear as a standalone credit in at least one song, OR
+  //     (b) they have 3+ distinct primary artists AND are 2+ words AND don't start with an article
+  //         — this catches genuine collaborators while excluding "the Heartbreakers",
+  //           "the Witnesses", "Double Trouble", etc.
+  const realArtists = useMemo(() => {
+    const collabRx = /\b(feat\.?|ft\.?|featuring|with)\b|\s&\s|\sand\s/i;
+    const standalone = new Set<string>();
+    for (const s of songs) {
+      if (!collabRx.test(s.artist)) standalone.add(normalizeArtistKey(s.artist));
+    }
+    const secPrimaries = new Map<string, Set<string>>();
+    for (const s of songs) {
+      const parts = extractCollabParts(s.artist);
+      if (parts.length <= 1) continue;
+      const pk = normalizeArtistKey(parts[0]);
+      for (const sec of parts.slice(1)) {
+        const sk = normalizeArtistKey(sec);
+        if (!sk) continue;
+        if (!secPrimaries.has(sk)) secPrimaries.set(sk, new Set());
+        secPrimaries.get(sk)!.add(pk);
+      }
+    }
+    const real = new Set<string>();
+    for (const s of songs) {
+      const parts = extractCollabParts(s.artist);
+      for (let i = 0; i < parts.length; i++) {
+        const key = normalizeArtistKey(parts[i]);
+        if (!key) continue;
+        if (i === 0 || standalone.has(key)) { real.add(key); continue; }
+        const wordCount = parts[i].trim().split(/\s+/).length;
+        const primaries = secPrimaries.get(key)?.size ?? 0;
+        if (wordCount >= 2 && !ARTICLE_PREFIX.test(parts[i]) && primaries >= 3) real.add(key);
+      }
+    }
+    return real;
+  }, [songs]);
+
   const filtered = useMemo(() => {
     let result = songs;
 
@@ -232,17 +290,27 @@ export default function Explorer() {
       .sort((a, b) => b.count - a.count);
   }, [songs]);
 
-  // All artists by unique song count, derived from the already-deduplicated filtered list
+  // All artists by song count — expands collaboration credits into individual artists
+  // so "Serge Gainsbourg and Brigitte Bardot" counts toward both artists.
   const artistsView = useMemo(() => {
     const counts: Record<string, number> = {};
+    const names: Record<string, string> = {};
     for (const s of filtered) {
-      const key = normalize(s.artist);
-      counts[key] = (counts[key] ?? 0) + 1;
+      const parts = extractCollabParts(s.artist);
+      const individuals = parts.length > 1 ? parts : [s.artist];
+      for (const individual of individuals) {
+        const key = normalizeArtistKey(individual);
+        if (!key || !realArtists.has(key)) continue;
+        counts[key] = (counts[key] ?? 0) + 1;
+        // Prefer shorter canonical display name seen across all credits
+        const canon = canonicalArtist[normalize(individual)] ?? individual;
+        if (!names[key] || canon.length < names[key].length) names[key] = canon;
+      }
     }
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
-      .map(([key, count]) => ({ artist: canonicalArtist[key] ?? key, count }));
-  }, [filtered, canonicalArtist]);
+      .map(([key, count]) => ({ artist: names[key] ?? key, count }));
+  }, [filtered, realArtists, canonicalArtist]);
 
   // Deduplicate by normalised artist+title so capitalisation variants
   // and collaboration-connector variants appear once.
