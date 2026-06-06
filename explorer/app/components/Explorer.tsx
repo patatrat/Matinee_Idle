@@ -109,7 +109,7 @@ export default function Explorer() {
   }, [view, statsData]);
 
   useEffect(() => {
-    fetch("/songs.json")
+    fetch("/songs.json?v=2")
       .then((r) => r.json())
       .then((data: Song[]) => {
         setSongs(data);
