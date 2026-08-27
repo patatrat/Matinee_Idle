@@ -10,7 +10,7 @@
 
 An interactive data explorer for 21 years of Radio New Zealand's Matinee Idle (2005–2026), hosted by Phil O'Brien and Simon Morris. The complete RNZ archive of songs has been scraped, enriched with metadata, and made browsable via a Next.js web app.
 
-**Dataset:** 15,411 songs · 5,722 unique artists · 100% genre coverage
+**Dataset:** 15,411 songs · 5,471 unique artists · 100% genre coverage
 
 ---
 
@@ -156,6 +156,6 @@ reggae, bluegrass, disco, metal, hip-hop, world, classical, soundtrack
 ## Data quality notes
 
 - Most-played song: *Cousin Mosquito* by Congresswoman Malinda Jackson Parker (16 plays), found under 4 different name spellings
-- 63% of artists (3,620) appeared exactly once
+- 62% of artists (3,371) appeared exactly once
 - Oldest song: Fred Astaire — *Puttin' on the Ritz* (1930)
 - Simon Morris played his own songs on his own show multiple times; these are uncatalogued in any database
