@@ -11,12 +11,6 @@ updates:
       all-dependencies:
         patterns: ["*"]
         update-types: ["minor", "patch"]
-    ignore:
-      # Next.js 16.2 cannot use the TypeScript 7 compiler API — it fails the build with
-      # "TypeScript 7.x does not provide the compiler API required by Next.js".
-      # Drop this once Next supports TS7 (or experimental.useTypeScriptCli is adopted).
-      - dependency-name: typescript
-        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
