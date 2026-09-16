@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
@@ -30,6 +31,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-full bg-neutral-950 text-neutral-100 font-sans antialiased">
         {children}
+        {/* Interim pageview analytics while the Umami instance is rebuilt.
+            Serves its script and beacon from /_vercel/insights on this origin,
+            so the CSP in next.config.ts needs no extra script-src/connect-src. */}
+        <Analytics />
       </body>
     </html>
   );
