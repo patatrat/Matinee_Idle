@@ -110,7 +110,7 @@ reggae, bluegrass, disco, metal, hip-hop, world, classical, soundtrack
 
 ### Where the data lives
 - **Neon project:** `shiny-sunset-93833202` (named `umami-analytics`), region ap-southeast-2
-- **Matinee Idle website_id:** `65225d81-5bcd-43f3-8f8c-f72ad5c48d50`
+- **Matinee Idle website_id:** `9a34eb9c-ef13-46f7-add9-bfb1f46f5d08` (new instance, Oct 2026). Historical data from the old instance is under `65225d81-5bcd-43f3-8f8c-f72ad5c48d50`
 - Standard Umami v2 schema: `website_event` (one row per event) joined to `event_data` (one row per event property) on `event_data.website_event_id = website_event.event_id`
 
 ### Events tracked (see Explorer.tsx, SongCard.tsx, StatsView.tsx)

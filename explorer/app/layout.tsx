@@ -25,7 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           async
           src="https://analytics.radomski.co.nz/script.js"
-          data-website-id="65225d81-5bcd-43f3-8f8c-f72ad5c48d50"
+          data-website-id="9a34eb9c-ef13-46f7-add9-bfb1f46f5d08"
           data-performance="true"
         />
       </head>
