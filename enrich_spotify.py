@@ -28,8 +28,10 @@ SONGS_BACK  = SONGS_PATH + ".bak"
 CHECKPOINT  = os.path.join(HERE, "spotify_cache.json")
 QUOTA_FILE  = os.path.join(HERE, "spotify_quota_reset.txt")
 
-CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID",     "f3bcd797aeaa4a50bcb6132366835d64")
-CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "30e26fd9d30844d08b94dced12fe380d")
+CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID", "")
+CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+if not CLIENT_ID or not CLIENT_SECRET:
+    sys.exit("Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in the environment.")
 
 RATE_LIMIT  = 0.6    # 1.7 req/sec — conservative to avoid quota issues
 SAVE_EVERY  = 100

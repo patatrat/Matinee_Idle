@@ -31,8 +31,10 @@ SONGS_BACK    = SONGS_PATH + ".bak"
 ARTIST_CACHE  = os.path.join(HERE, "spotify_artist_genre_cache.json")
 QUOTA_FILE    = os.path.join(HERE, "spotify_quota_reset.txt")  # shared with enrich_spotify.py
 
-CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID",     "f3bcd797aeaa4a50bcb6132366835d64")
-CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "30e26fd9d30844d08b94dced12fe380d")
+CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID", "")
+CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+if not CLIENT_ID or not CLIENT_SECRET:
+    sys.exit("Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in the environment.")
 
 TRACK_RATE    = 0.6    # seconds between track calls
 ARTIST_RATE   = 3.0    # seconds between artist calls (much more conservative)
