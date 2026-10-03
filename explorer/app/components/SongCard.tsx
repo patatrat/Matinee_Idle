@@ -175,7 +175,7 @@ export default function SongCard({
 
   function openSpotifySearch() {
     const q = encodeURIComponent(`${song.artist} ${song.title}`);
-    window.open(`https://open.spotify.com/search/${q}`, "_blank", "noopener,noreferrer");
+    window.open(`https://open.spotify.com/search/${q}`, "_blank", "noopener");
   }
 
   async function handleSpotifyClick() {
@@ -195,7 +195,7 @@ export default function SongCard({
 
     const cached = localStorage.getItem(cacheKey(song.artist, song.title));
     if (cached) {
-      window.open(cached, "_blank", "noopener,noreferrer");
+      window.open(cached, "_blank", "noopener");
       return;
     }
 

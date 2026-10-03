@@ -506,7 +506,7 @@ export default function Explorer() {
               <a
                 href="https://radomski.co.nz/blog/matinee-idle"
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="noopener"
                 className="mt-1.5 inline-block text-[11px] text-amber-500/70 hover:text-amber-400 transition-colors"
               >
                 What&apos;s this all about then? →
@@ -816,7 +816,7 @@ export default function Explorer() {
 
       {/* Footer */}
       <footer className="border-t border-neutral-800 px-4 py-4 sm:px-8 text-center text-xs text-neutral-700">
-        <a href="https://www.rnz.co.nz" target="_blank" rel="noopener noreferrer" className="hover:text-neutral-500 transition-colors">
+        <a href="https://www.rnz.co.nz" target="_blank" rel="noopener" className="hover:text-neutral-500 transition-colors">
           Data sourced from RNZ archives
         </a>{" "}
         &middot; radomski.co.nz
