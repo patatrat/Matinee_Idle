@@ -28,7 +28,9 @@ SONGS_IN   = os.path.join(HERE, "songs_enriched.json")
 SONGS_FALL = os.path.join(HERE, "songs.json")          # fallback if enriched doesn't exist
 SONGS_OUT  = os.path.join(HERE, "songs_enriched.json")
 CHECKPOINT = os.path.join(HERE, "lastfm_genre_cache.json")
-API_KEY    = os.environ.get("LASTFM_API_KEY", "68aae586eac1ab54f7cf77fa6ca9f9a7")
+API_KEY    = os.environ.get("LASTFM_API_KEY", "")
+if not API_KEY:
+    sys.exit("Set LASTFM_API_KEY in the environment.")
 RATE_LIMIT = 0.3    # seconds between requests (~3.3/sec, safely under Last.fm's 5/sec)
 SAVE_EVERY = 200
 DRY_RUN    = "--dry-run" in sys.argv

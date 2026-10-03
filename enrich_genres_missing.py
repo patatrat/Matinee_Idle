@@ -40,7 +40,7 @@ HERE          = os.path.dirname(os.path.abspath(__file__))
 SONGS_PATH    = os.path.join(HERE, "explorer/public/songs.json")
 SONGS_BACKUP  = SONGS_PATH + ".bak"
 CACHE_PATH    = os.path.join(HERE, "lastfm_missing_cache.json")
-LASTFM_KEY    = os.environ.get("LASTFM_API_KEY", "68aae586eac1ab54f7cf77fa6ca9f9a7")
+LASTFM_KEY    = os.environ.get("LASTFM_API_KEY", "")
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 DEEPSEEK_KEY  = os.environ.get("DEEPSEEK_API_KEY", "")
 
@@ -484,8 +484,9 @@ def main():
     print(f"  Assigned: {p1}  |  have genre: {after1}  |  still missing: {len(songs) - after1}\n")
 
     # ── Pass 2 ──────────────────────────────────────────────────────────────
-    if SKIP_LASTFM:
-        print("── Pass 2: Last.fm ─ SKIPPED ─────────────────────────────────────\n")
+    if SKIP_LASTFM or not LASTFM_KEY:
+        label = "SKIPPED" if SKIP_LASTFM else "no LASTFM_API_KEY"
+        print(f"── Pass 2: Last.fm ─ {label} ─────────────────────────────────────\n")
         p2 = 0
     else:
         print("── Pass 2: Last.fm artist.getTopTags ─────────────────────────────")
