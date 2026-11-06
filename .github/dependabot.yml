@@ -5,6 +5,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Hold routine version bumps for a few days after release so a compromised
+    # or broken publish is usually yanked before we pull it in. Security
+    # updates ignore cooldown and still arrive immediately.
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
     groups:
       # Minor/patch only, so a single breaking major can never block the safe bumps.
       # Majors arrive as their own PRs and are reviewed one at a time.
@@ -17,6 +23,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Hold routine version bumps for a few days after release so a compromised
+    # or broken publish is usually yanked before we pull it in. Security
+    # updates ignore cooldown and still arrive immediately.
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
     groups:
       all-dependencies:
         patterns: ["*"]

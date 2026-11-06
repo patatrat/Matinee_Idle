@@ -106,6 +106,16 @@ reggae, bluegrass, disco, metal, hip-hop, world, classical, soundtrack
 
 ---
 
+## Dependency updates (Dependabot)
+
+- `.github/dependabot.yml`: weekly npm (`/explorer`) + github-actions updates; minor/patch grouped, majors as separate PRs; 3-day cooldown (7 for majors) on version updates. Security updates bypass cooldown.
+- `.github/workflows/dependabot-automerge.yml`: queues **minor/patch** Dependabot PRs (incl. security fixes) for squash auto-merge; majors get a comment and need manual review.
+- **Relies on branch protection on `main` requiring the `build` check** (ci.yml). Without it, `gh pr merge --auto` merges immediately, before CI.
+- Lesson (Nov 2026): critical Next.js RCE fix (#35) sat unmerged 6 days; superseded `next` bump PRs piled up (#28–#30, #34). Merge security PRs first, then `@dependabot rebase` the rest one at a time — they all conflict on `package-lock.json`.
+- Auto-merges done with `GITHUB_TOKEN` don't trigger the push CI run on `main`; Vercel still deploys via its Git integration.
+
+---
+
 ## Listener analytics (Umami on Neon)
 
 ### Where the data lives
