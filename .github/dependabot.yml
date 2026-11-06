@@ -23,12 +23,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    # Hold routine version bumps for a few days after release so a compromised
-    # or broken publish is usually yanked before we pull it in. Security
-    # updates ignore cooldown and still arrive immediately.
+    # Same cooldown as npm. The semver-*-days options aren't supported for
+    # github-actions (Dependabot rejects the whole config), so default only.
     cooldown:
       default-days: 3
-      semver-major-days: 7
     groups:
       all-dependencies:
         patterns: ["*"]
